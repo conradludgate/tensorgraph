@@ -1,6 +1,6 @@
 use std::{
     alloc::{Allocator, Layout},
-    marker::PhantomData, ops::Deref, borrow::Borrow, mem::MaybeUninit,
+    marker::PhantomData, ops::{Deref, DerefMut}, borrow::Borrow, mem::MaybeUninit,
 };
 
 use crate::{
@@ -140,6 +140,18 @@ impl<T, D: Device> Deref for Vec<T, D> {
         }
     }
 }
+
+impl<T, D: Device> DerefMut for Vec<T, D> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe {
+            let ptr: *mut [T] = self.buf.as_ptr().as_raw();
+            let (ptr, _) = ptr.to_raw_parts();
+            let ptr = std::ptr::from_raw_parts_mut(ptr, self.len);
+            &mut *(ptr as *mut _)
+        }
+    }
+}
+
 impl<T, D: Device> Borrow<Slice<T, D>> for Vec<T, D> {
     fn borrow(&self) -> &Slice<T, D> {
         self.deref()
