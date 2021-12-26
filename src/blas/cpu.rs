@@ -4,13 +4,15 @@ extern crate blas_sys;
 use crate::device::cpu::Cpu;
 use std::alloc::Allocator;
 
-use super::BLAS;
+use super::{BLASDevice, BLAS};
+
+impl<A: Allocator> BLASDevice for Cpu<A> {
+    type Context = ();
+}
 
 impl<A: Allocator> BLAS<Cpu<A>> for f32 {
-    type Context = ();
-
     unsafe fn gemm(
-        _ctx: Self::Context,
+        _ctx: (),
         transa: super::MatrixOp,
         transb: super::MatrixOp,
         m: i32,
@@ -44,10 +46,8 @@ impl<A: Allocator> BLAS<Cpu<A>> for f32 {
 }
 
 impl<A: Allocator> BLAS<Cpu<A>> for f64 {
-    type Context = ();
-
     unsafe fn gemm(
-        _ctx: Self::Context,
+        _ctx: (),
         transa: super::MatrixOp,
         transb: super::MatrixOp,
         m: i32,

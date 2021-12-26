@@ -1,11 +1,12 @@
 use std::{
     alloc::Allocator,
     marker::PhantomData,
-    ops::{Deref, DerefMut}, mem::MaybeUninit,
+    mem::MaybeUninit,
+    ops::{Deref, DerefMut, Index, IndexMut},
 };
 
 use crate::{
-    device::{cpu::Cpu, Device},
+    device::{cpu::Cpu, Device, DevicePtr},
     vec::Vec,
 };
 
@@ -21,6 +22,18 @@ impl<T, D: Device> Slice<T, D> {
 
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
+    }
+
+    pub fn as_ptr(&self) -> D::Ptr<T> {
+        D::Ptr::from_raw(&self.inner as *const [T] as *mut T)
+    }
+}
+impl<'a, T, D: Device> Slice<MaybeUninit<T>, D> {
+    pub unsafe fn assume_init(&self) -> &Slice<T, D> {
+        &*(MaybeUninit::slice_assume_init_ref(&self.inner) as *const [T] as *const _)
+    }
+    pub unsafe fn assume_init_mut(&mut self) -> &mut Slice<T, D> {
+        &mut *(MaybeUninit::slice_assume_init_mut(&mut self.inner) as *mut [T] as *mut _)
     }
 }
 
@@ -50,11 +63,17 @@ impl<T: Copy, D: Device> Slice<MaybeUninit<T>, D> {
     }
 }
 
-impl<T, D: Device> ToOwned for Slice<T, D> {
+impl<T: Copy, D: Device + Default> ToOwned for Slice<T, D> {
     type Owned = Vec<T, D>;
 
     fn to_owned(&self) -> Self::Owned {
-        todo!()
+        unsafe {
+            let mut v = Vec::with_capacity(self.len());
+            let buf = &mut v.space_capacity_mut()[..self.len()];
+            buf.init_from_slice(self);
+            v.set_len(self.len());
+            v
+        }
     }
 }
 
@@ -69,5 +88,25 @@ impl<T, A: Allocator> Deref for Slice<T, Cpu<A>> {
 impl<T, A: Allocator> DerefMut for Slice<T, Cpu<A>> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
+    }
+}
+
+impl<T, D: Device, S> Index<S> for Slice<T, D>
+where
+    [T]: Index<S, Output = [T]>,
+{
+    type Output = Self;
+
+    fn index(&self, index: S) -> &Self::Output {
+        unsafe { &*(&self.inner[index] as *const [T] as *const Self) }
+    }
+}
+
+impl<T, D: Device, S> IndexMut<S> for Slice<T, D>
+where
+    [T]: IndexMut<S, Output = [T]>,
+{
+    fn index_mut(&mut self, index: S) -> &mut Self::Output {
+        unsafe { &mut *(&mut self.inner[index] as *mut [T] as *mut Self) }
     }
 }

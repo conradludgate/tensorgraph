@@ -29,6 +29,10 @@ impl<T, D: Device> Vec<T, D> {
         }
     }
 
+    pub fn with_capacity(capacity: usize) -> Self where D: Default {
+        Self::with_capacity_in(capacity, D::default())
+    }
+
     pub fn with_capacity_in(capacity: usize, device: D) -> Self {
         unsafe {
             let (layout, _) = Layout::new::<T>().repeat(capacity).unwrap();
