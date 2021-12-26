@@ -13,5 +13,4 @@ pub mod blas;
 pub mod device;
 pub mod ptr;
 pub mod vec;
-pub mod matrix;
-pub mod tensor;
+pub mod array;

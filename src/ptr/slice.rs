@@ -29,9 +29,13 @@ impl<T, D: Device> Slice<T, D> {
     }
 }
 impl<'a, T, D: Device> Slice<MaybeUninit<T>, D> {
+    /// # Safety
+    /// Contents must be initialised
     pub unsafe fn assume_init(&self) -> &Slice<T, D> {
         &*(MaybeUninit::slice_assume_init_ref(&self.inner) as *const [T] as *const _)
     }
+    /// # Safety
+    /// Contents must be initialised
     pub unsafe fn assume_init_mut(&mut self) -> &mut Slice<T, D> {
         &mut *(MaybeUninit::slice_assume_init_mut(&mut self.inner) as *mut [T] as *mut _)
     }
@@ -88,6 +92,24 @@ impl<T, A: Allocator> Deref for Slice<T, Cpu<A>> {
 impl<T, A: Allocator> DerefMut for Slice<T, Cpu<A>> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
+    }
+}
+
+impl<'a, T, D: Device> AsRef<Slice<T, D>> for &'a Slice<T, D> {
+    fn as_ref(&self) -> &Slice<T, D> {
+        self
+    }
+}
+
+impl<'a, T, D: Device> AsRef<Slice<T, D>> for &'a mut Slice<T, D> {
+    fn as_ref(&self) -> &Slice<T, D> {
+        self
+    }
+}
+
+impl<'a, T, D: Device> AsMut<Slice<T, D>> for &'a mut Slice<T, D> {
+    fn as_mut(&mut self) -> &mut Slice<T, D> {
+        self
     }
 }
 

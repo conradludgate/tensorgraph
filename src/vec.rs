@@ -162,6 +162,18 @@ impl<T, D: Device> Borrow<Slice<T, D>> for Vec<T, D> {
     }
 }
 
+impl<T, D: Device> AsRef<Slice<T, D>> for Vec<T, D> {
+    fn as_ref(&self) -> &Slice<T, D> {
+        self.deref()
+    }
+}
+
+impl<T, D: Device> AsMut<Slice<T, D>> for Vec<T, D> {
+    fn as_mut(&mut self) -> &mut Slice<T, D> {
+        self.deref_mut()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Vec;

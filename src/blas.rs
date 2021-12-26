@@ -14,7 +14,7 @@ pub trait BLASDevice: Device {
     type Context: Clone;
 }
 
-pub trait BLAS<D: BLASDevice>: Sized + Copy {
+pub trait GEMM<D: BLASDevice>: Sized + Copy {
     #[allow(clippy::too_many_arguments)]
     /// # Safety
     /// This is often a call across an FFI barrier, so the links or devices need to be
