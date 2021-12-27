@@ -22,7 +22,7 @@ where
 
 impl<S: Storage, Dim: Dimension> Tensor<S, Dim>
 where
-    S::Device: BLASDevice + Default,
+    S::Device: BLASDevice,
 {
     pub fn from_shape_in(ctx: <S::Device as BLASDevice>::Context, shape: Dim, data: S) -> Self {
         assert_eq!(data.as_ref().len(), shape.len());
@@ -44,12 +44,7 @@ where
         self.shape.as_mut().swap(i, j);
         self.strides.as_mut().swap(i, j);
     }
-}
 
-impl<S: Storage, Dim: Dimension + Clone> Tensor<S, Dim>
-where
-    S::Device: BLASDevice + Default,
-{
     pub fn view(&self) -> Tensor<&Slice<S::T, S::Device>, Dim> {
         Tensor {
             shape: self.shape.clone(),
@@ -76,6 +71,40 @@ where
         view.reverse_axes();
         view
     }
+
+    pub fn into_owned(self) -> Tensor<S::Owned, Dim>
+    where
+        S: IntoOwned,
+        S::Owned: Storage<T = S::T, Device = S::Device>,
+    {
+        Tensor {
+            shape: self.shape,
+            strides: self.strides,
+            data: self.data.into_owned(),
+            ctx: self.ctx,
+        }
+    }
+
+    pub fn slice_axis(&self, axis: usize, n: usize) -> Tensor<&Slice<S::T, S::Device>, Dim::Smaller>
+    where
+        Dim: ReduceDim,
+    {
+        assert!(axis < self.shape.as_ref().len());
+
+        let (shape, m) = self.shape.remove(axis);
+        let (strides, s) = self.strides.remove(axis);
+
+        dbg!((m, s));
+
+        assert!(n < m);
+
+        Tensor {
+            shape,
+            strides,
+            data: &self.data.as_ref()[s * n..],
+            ctx: self.ctx.clone(),
+        }
+    }
 }
 
 impl<S: Storage> Tensor<S, [usize; 2]>
@@ -91,13 +120,13 @@ where
         S::Device: Default,
         S::T: GEMM<S::Device>,
     {
-        let rows = self.shape[0];
-        let cols = rhs.shape[1];
+        let rows = self.shape[1];
+        let cols = rhs.shape[0];
         let mut v = Vec::with_capacity(rows * cols);
         unsafe {
             let uninit = Tensor::from_shape_in(
                 self.ctx.clone(),
-                [rows, cols],
+                [cols, rows],
                 &mut v.space_capacity_mut()[..rows * cols],
             );
 
@@ -105,13 +134,11 @@ where
 
             v.set_len(rows * cols);
         }
-        Tensor::from_shape_in(self.ctx.clone(), [rows, cols], v)
+        Tensor::from_shape_in(self.ctx.clone(), [cols, rows], v)
     }
 }
 
-impl<'a, T: Copy, D: BLASDevice + Default, Dim: Dimension>
-    Tensor<&'a mut Slice<MaybeUninit<T>, D>, Dim>
-{
+impl<'a, T: Copy, D: BLASDevice, Dim: Dimension> Tensor<&'a mut Slice<MaybeUninit<T>, D>, Dim> {
     /// # Safety
     /// Contents must be initialised
     pub unsafe fn assume_init(self) -> Tensor<&'a mut Slice<T, D>, Dim> {
@@ -157,13 +184,16 @@ pub fn gemm<F: GEMM<D>, D: BLASDevice + Default>(
     beta: F,
     c: Tensor<&mut Slice<F, D>, [usize; 2]>,
 ) {
-    assert_eq!(a.shape[1], b.shape[0]);
-    assert_eq!(a.shape[0], c.shape[0]);
-    assert_eq!(b.shape[1], c.shape[1]);
+    let [colsa, rowsa] = a.shape;
+    let [colsb, rowsb] = b.shape;
+    let [colsc, rowsc] = c.shape;
+    assert_eq!(rowsa, rowsc);
+    assert_eq!(colsb, colsc);
+    assert_eq!(colsa, rowsb);
 
-    let m = a.shape[0] as i32;
-    let n = b.shape[1] as i32;
-    let k = a.shape[1] as i32;
+    let m = rowsa as i32;
+    let n = colsb as i32;
+    let k = rowsb as i32;
 
     let (transa, lda) = if a.strides[0] == 1 {
         (MatrixOp::NoTrans, a.strides[1] as i32)
@@ -256,9 +286,14 @@ impl<'a, T, D: Device> StorageMut for Vec<T, D> {}
 
 impl<'a, T, D: Device> StorageMut for &'a mut Slice<T, D> {}
 
-pub trait Dimension: AsRef<[usize]> + AsMut<[usize]> {
+pub trait Dimension: AsRef<[usize]> + AsMut<[usize]> + Clone {
     fn len(&self) -> usize;
     fn column_major_strides(&self) -> Self;
+}
+
+pub trait ReduceDim: Dimension {
+    type Smaller: Dimension;
+    fn remove(&self, axis: usize) -> (Self::Smaller, usize);
 }
 
 impl<const N: usize> Dimension for [usize; N] {
@@ -267,10 +302,10 @@ impl<const N: usize> Dimension for [usize; N] {
     }
     fn column_major_strides(&self) -> Self {
         let mut strides = *self;
-        strides[0] = 1;
+        strides[N - 1] = 1;
 
-        for i in 1..N {
-            strides[i] = strides[i - 1] * self[i - 1];
+        for i in (1..N).rev() {
+            strides[i - 1] = strides[i] * self[N - i];
         }
 
         strides
@@ -283,18 +318,49 @@ impl Dimension for std::vec::Vec<usize> {
     }
     fn column_major_strides(&self) -> Self {
         let mut strides = self.clone();
-        strides[0] = 1;
+        strides[self.len() - 1] = 1;
 
-        for i in 1..self.len() {
-            strides[i] = strides[i - 1] * self[i - 1];
+        for i in (1..self.len()).rev() {
+            strides[i - 1] = strides[i] * self[self.len() - i];
         }
 
         strides
     }
 }
 
+impl ReduceDim for std::vec::Vec<usize> {
+    type Smaller = Self;
+    fn remove(&self, axis: usize) -> (Self::Smaller, usize) {
+        let mut new = self.clone();
+        let n = std::vec::Vec::remove(&mut new, axis);
+        (new, n)
+    }
+}
+
+impl<const N: usize> ReduceDim for [usize; N]
+where
+    [(); N - 1]: Sized,
+{
+    type Smaller = [usize; N - 1];
+    fn remove(&self, axis: usize) -> (Self::Smaller, usize) {
+        assert!(axis < N);
+        if N == 1 {
+            return ([0_usize; N - 1], self[0]);
+        }
+
+        let mut new = [0; N - 1];
+        let (lhs, rhs) = self.split_at(axis);
+        let (n, rhs) = rhs.split_first().unwrap();
+        new[..axis].copy_from_slice(lhs);
+        new[axis..].copy_from_slice(rhs);
+        (new, *n)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::ops::Deref;
+
     use crate::{array::Tensor, vec::Vec};
 
     #[test]
@@ -302,8 +368,8 @@ mod tests {
         // column major
         let a: Vec<f32, _> = Vec::from(vec![0., 2., 4., 1., 3., 5.]);
         let b: Vec<f32, _> = Vec::from(vec![0., 2., 1., 3.]);
-        let a = Tensor::from_shape_in((), [3, 2], a);
-        let b = Tensor::from_shape_in((), [2, 2], b);
+        let a = Tensor::from_shape_in((), [2, 3], a); // 3 rows x 2 cols
+        let b = Tensor::from_shape_in((), [2, 2], b); // 2 rows x 2 cols
 
         let c = a.dot(b);
 
@@ -325,5 +391,24 @@ mod tests {
 
         let c3 = a.t().dot(b);
         assert_eq!(std::vec::Vec::from(c3.data), vec![17.0, 39.0, 23.0, 53.0]);
+    }
+
+    #[test]
+    fn slice() {
+        // column major
+        let a: Vec<f32, _> = Vec::from(vec![0., 1., 2., 3., 4., 5.]);
+        let a = Tensor::from_shape_in((), [2, 3], a);
+
+        let a10 = a.slice_axis(1, 0);
+        assert_eq!(a10.data.deref(), [0., 1., 2., 3., 4., 5.]);
+        assert_eq!(a10.shape, [2]);
+
+        let a11 = a.slice_axis(1, 1);
+        assert_eq!(a11.data.deref(), [2., 3., 4., 5.]);
+        assert_eq!(a11.shape, [2]);
+
+        let a12 = a.slice_axis(1, 2);
+        assert_eq!(a12.data.deref(), [4., 5.]);
+        assert_eq!(a12.shape, [2]);
     }
 }

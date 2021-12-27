@@ -5,7 +5,8 @@
     nonnull_slice_from_raw_parts,
     slice_ptr_len,
     ptr_metadata,
-    maybe_uninit_slice
+    maybe_uninit_slice,
+    generic_const_exprs
 )]
 
 
