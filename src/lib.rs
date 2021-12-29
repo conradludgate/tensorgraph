@@ -1,3 +1,4 @@
+#![allow(incomplete_features)]
 #![feature(
     generic_associated_types,
     allocator_api,
@@ -14,4 +15,4 @@ pub mod blas;
 pub mod device;
 pub mod ptr;
 pub mod vec;
-pub mod array;
+pub mod tensor;

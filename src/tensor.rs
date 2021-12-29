@@ -306,17 +306,7 @@ pub trait ReduceDim: Dimension {
 }
 
 impl<const N: usize> Dimension for [usize; N] {}
-
 impl Dimension for std::vec::Vec<usize> {}
-
-impl ReduceDim for std::vec::Vec<usize> {
-    type Smaller = Self;
-    fn remove(&self, axis: usize) -> (Self::Smaller, usize) {
-        let mut new = self.clone();
-        let n = std::vec::Vec::remove(&mut new, axis);
-        (new, n)
-    }
-}
 
 impl<const N: usize> ReduceDim for [usize; N]
 where
@@ -338,11 +328,20 @@ where
     }
 }
 
+impl ReduceDim for std::vec::Vec<usize> {
+    type Smaller = Self;
+    fn remove(&self, axis: usize) -> (Self::Smaller, usize) {
+        let mut new = self.clone();
+        let n = std::vec::Vec::remove(&mut new, axis);
+        (new, n)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::ops::Deref;
 
-    use crate::{array::Tensor, vec::Vec};
+    use crate::{tensor::Tensor, vec::Vec};
 
     #[test]
     fn matmul() {
