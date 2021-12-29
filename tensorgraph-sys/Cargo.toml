@@ -1,0 +1,25 @@
+[package]
+name = "tensorgraph-sys"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+num-traits = "0.2"
+
+# cuda
+cust = { version = "0.2", optional = true }
+cust_raw = { version = "0.11", optional = true }
+
+# blas
+blas-src = { version = "0.8" }
+blas-sys = { version = "0.7" }
+
+[features]
+default = ["accelerate"]
+cuda = ["cust", "cust_raw"]
+
+accelerate = ["blas-src/accelerate"]
+blis = ["blas-src/blis"]
+intel-mkl = ["blas-src/intel-mkl"]
+netlib = ["blas-src/netlib"]
+openblas = ["blas-src/openblas"]
