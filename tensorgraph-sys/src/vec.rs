@@ -1,6 +1,9 @@
 use std::{
     alloc::{Allocator, Layout},
-    marker::PhantomData, ops::{Deref, DerefMut}, borrow::Borrow, mem::MaybeUninit,
+    borrow::Borrow,
+    marker::PhantomData,
+    mem::MaybeUninit,
+    ops::{Deref, DerefMut},
 };
 
 use crate::{
@@ -29,7 +32,10 @@ impl<T, D: Device> Vec<T, D> {
         }
     }
 
-    pub fn with_capacity(capacity: usize) -> Self where D: Default {
+    pub fn with_capacity(capacity: usize) -> Self
+    where
+        D: Default,
+    {
         Self::with_capacity_in(capacity, D::default())
     }
 

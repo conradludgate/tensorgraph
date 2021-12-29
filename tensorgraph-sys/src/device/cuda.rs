@@ -13,7 +13,7 @@ impl Device for Cuda {
         if size == 0 {
             return Err(CudaError::InvalidMemoryAllocation);
         }
-    
+
         let mut ptr: *mut c_void = ptr::null_mut();
         cust_raw::cuMemAlloc_v2(&mut ptr as *mut *mut c_void as *mut u64, size).to_result()?;
         let ptr = ptr as *mut [u8];

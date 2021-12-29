@@ -10,9 +10,8 @@
     generic_const_exprs
 )]
 
-
 pub mod blas;
 pub mod device;
 pub mod ptr;
-pub mod vec;
 pub mod tensor;
+pub mod vec;

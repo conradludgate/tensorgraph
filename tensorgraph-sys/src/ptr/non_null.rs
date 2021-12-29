@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 
 use crate::device::{Device, DevicePtr};
 
-
 pub struct NonNull<T: ?Sized, D: Device + ?Sized> {
     inner: std::ptr::NonNull<T>,
     _marker: PhantomData<D>,
