@@ -94,8 +94,6 @@ where
         let (shape, m) = self.shape.remove(axis);
         let (strides, s) = self.strides.remove(axis);
 
-        dbg!((m, s));
-
         assert!(n < m);
 
         Tensor {
@@ -192,27 +190,15 @@ pub fn gemm<F: GEMM<D>, D: BLASDevice + Default>(
     assert_eq!(colsa, rowsb);
 
     let m = rowsa as i32;
-    let n = colsb as i32;
     let k = rowsb as i32;
+    let n = colsb as i32;
 
-    let (transa, lda) = if a.strides[0] == 1 {
-        (MatrixOp::NoTrans, a.strides[1] as i32)
-    } else if a.strides[1] == 1 {
-        (MatrixOp::Trans, a.strides[0] as i32)
-    } else {
-        panic!("one of the strides must be 1 (contiguous)")
-    };
-    let (transb, ldb) = if b.strides[0] == 1 {
-        (MatrixOp::NoTrans, b.strides[1] as i32)
-    } else if b.strides[1] == 1 {
-        (MatrixOp::Trans, b.strides[0] as i32)
-    } else {
-        panic!("one of the strides must be 1 (contiguous)")
-    };
+    let (transa, lda) = lead(a.strides);
+    let (transb, ldb) = lead(b.strides);
 
     // C must not be transposed
-    assert_eq!(c.strides[0], 1);
-    let ldc = c.strides[1] as i32;
+    assert_eq!(c.strides[1], 1);
+    let ldc = c.strides[0] as i32;
 
     unsafe {
         F::gemm(
@@ -231,6 +217,16 @@ pub fn gemm<F: GEMM<D>, D: BLASDevice + Default>(
             c.data.as_ptr(),
             ldc,
         )
+    }
+}
+
+fn lead(s: [usize; 2]) -> (MatrixOp, i32) {
+    if s[0] == 1 {
+        (MatrixOp::Trans, s[1] as i32)
+    } else if s[1] == 1 {
+        (MatrixOp::NoTrans, s[0] as i32)
+    } else {
+        panic!("one of the strides must be 1 (contiguous)")
     }
 }
 
@@ -286,9 +282,22 @@ impl<'a, T, D: Device> StorageMut for Vec<T, D> {}
 
 impl<'a, T, D: Device> StorageMut for &'a mut Slice<T, D> {}
 
+#[allow(clippy::len_without_is_empty)]
 pub trait Dimension: AsRef<[usize]> + AsMut<[usize]> + Clone {
-    fn len(&self) -> usize;
-    fn column_major_strides(&self) -> Self;
+    fn len(&self) -> usize {
+        self.as_ref().iter().product()
+    }
+    fn column_major_strides(&self) -> Self {
+        let mut strides = self.clone();
+        let s = strides.as_mut();
+        s[s.len() - 1] = 1;
+
+        for i in (1..s.len()).rev() {
+            s[i - 1] = s[i] * self.as_ref()[i];
+        }
+
+        strides
+    }
 }
 
 pub trait ReduceDim: Dimension {
@@ -296,37 +305,9 @@ pub trait ReduceDim: Dimension {
     fn remove(&self, axis: usize) -> (Self::Smaller, usize);
 }
 
-impl<const N: usize> Dimension for [usize; N] {
-    fn len(&self) -> usize {
-        self.iter().product()
-    }
-    fn column_major_strides(&self) -> Self {
-        let mut strides = *self;
-        strides[N - 1] = 1;
+impl<const N: usize> Dimension for [usize; N] {}
 
-        for i in (1..N).rev() {
-            strides[i - 1] = strides[i] * self[N - i];
-        }
-
-        strides
-    }
-}
-
-impl Dimension for std::vec::Vec<usize> {
-    fn len(&self) -> usize {
-        self.iter().product()
-    }
-    fn column_major_strides(&self) -> Self {
-        let mut strides = self.clone();
-        strides[self.len() - 1] = 1;
-
-        for i in (1..self.len()).rev() {
-            strides[i - 1] = strides[i] * self[self.len() - i];
-        }
-
-        strides
-    }
-}
+impl Dimension for std::vec::Vec<usize> {}
 
 impl ReduceDim for std::vec::Vec<usize> {
     type Smaller = Self;
@@ -399,16 +380,31 @@ mod tests {
         let a: Vec<f32, _> = Vec::from(vec![0., 1., 2., 3., 4., 5.]);
         let a = Tensor::from_shape_in((), [2, 3], a);
 
+        // axis 0 (columns)
+        let a00 = a.slice_axis(0, 0);
+        assert_eq!(a00.data.deref(), [0., 1., 2., 3., 4., 5.]);
+        assert_eq!(a00.shape, [3]);
+        assert_eq!(a00.strides, [1]);
+
+        let a01 = a.slice_axis(0, 1);
+        assert_eq!(a01.data.deref(), [3., 4., 5.]);
+        assert_eq!(a01.shape, [3]);
+        assert_eq!(a01.strides, [1]);
+
+        // acis 1 (rows)
         let a10 = a.slice_axis(1, 0);
-        assert_eq!(a10.data.deref(), [0., 1., 2., 3., 4., 5.]);
+        assert_eq!(a10.data.deref(), [0., 1., 2., 3., 4., 5.]); // skips every 3 numbers, so represents 0, 3
         assert_eq!(a10.shape, [2]);
+        assert_eq!(a10.strides, [3]);
 
         let a11 = a.slice_axis(1, 1);
-        assert_eq!(a11.data.deref(), [2., 3., 4., 5.]);
+        assert_eq!(a11.data.deref(), [1., 2., 3., 4., 5.]); // skips every 3 numbers, so represents 1, 4
         assert_eq!(a11.shape, [2]);
+        assert_eq!(a11.strides, [3]);
 
         let a12 = a.slice_axis(1, 2);
-        assert_eq!(a12.data.deref(), [4., 5.]);
+        assert_eq!(a12.data.deref(), [2., 3., 4., 5.]); // skips every 3 numbers, so represents 2, 5
         assert_eq!(a12.shape, [2]);
+        assert_eq!(a12.strides, [3]);
     }
 }
