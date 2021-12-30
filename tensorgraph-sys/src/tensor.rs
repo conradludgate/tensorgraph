@@ -341,7 +341,7 @@ impl ReduceDim for std::vec::Vec<usize> {
 mod tests {
     use std::ops::Deref;
 
-    use crate::{tensor::Tensor, vec::Vec};
+    use crate::{tensor::Tensor, vec::Vec, device::Device};
 
     #[test]
     fn matmul() {
@@ -405,5 +405,37 @@ mod tests {
         assert_eq!(a12.data.deref(), [2., 3., 4., 5.]); // skips every 3 numbers, so represents 2, 5
         assert_eq!(a12.shape, [2]);
         assert_eq!(a12.strides, [3]);
+    }
+
+    #[test]
+    fn matmul_cuda() {
+        use crate::device::cuda::Cuda;
+        use crate::blas::cublas::ToCublasResult;
+
+        let ctx = cust::quick_init().unwrap();
+
+        // column major
+        let mut a = Vec::<f32, Cuda>::with_capacity(6);
+        a.space_capacity_mut().init_from_host(&[0., 2., 4., 1., 3., 5.]);
+        unsafe { a.set_len(6); }
+
+        let mut b = Vec::<f32, Cuda>::with_capacity(4);
+        b.space_capacity_mut().init_from_host(&[0., 2., 1., 3.]);
+        unsafe { b.set_len(4); }
+
+        let mut handle = std::ptr::null_mut();
+        unsafe { rcublas_sys::cublasCreate_v2(&mut handle).to_cublas_result().unwrap(); }
+
+        let a = Tensor::from_shape_in(handle, [2, 3], a); // 3 rows x 2 cols
+        let b = Tensor::from_shape_in(handle, [2, 2], b); // 2 rows x 2 cols
+
+        let c = a.dot(b);
+
+        let mut out = vec![0.; 6];
+        Cuda::copy_to_host(c.data.deref(), &mut out);
+
+        assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
+
+        cust::context::Context::drop(ctx).unwrap();
     }
 }

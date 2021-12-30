@@ -104,27 +104,6 @@ impl<T: ?Sized> DevicePtr<T> for *mut T {
     {
         self.write(val)
     }
-
-    unsafe fn add(self, count: usize) -> Self
-    where
-        T: Sized,
-    {
-        self.add(count)
-    }
-
-    unsafe fn sub(self, count: usize) -> Self
-    where
-        T: Sized,
-    {
-        self.sub(count)
-    }
-
-    unsafe fn offset(self, count: isize) -> Self
-    where
-        T: Sized,
-    {
-        self.offset(count)
-    }
 }
 
 impl<T: ?Sized, A: Allocator> From<std::ptr::NonNull<T>> for NonNull<T, Cpu<A>> {

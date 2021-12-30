@@ -27,6 +27,18 @@ impl<T, D: Device> Slice<T, D> {
     pub fn as_ptr(&self) -> D::Ptr<T> {
         D::Ptr::from_raw(&self.inner as *const [T] as *mut T)
     }
+
+    pub fn as_slice_ptr(&self) -> D::Ptr<[T]> {
+        D::Ptr::from_raw(&self.inner as *const [T] as *mut [T])
+    }
+
+    pub unsafe fn from_slice_ptr<'a>(ptr: D::Ptr<[T]>) -> &'a Self {
+        &*(ptr.as_raw() as *const Self)
+    }
+
+    pub unsafe fn from_slice_ptr_mut<'a>(ptr: D::Ptr<[T]>) -> &'a mut Self {
+        &mut *(ptr.as_raw() as *mut Self)
+    }
 }
 impl<'a, T, D: Device> Slice<MaybeUninit<T>, D> {
     /// # Safety

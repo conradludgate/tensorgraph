@@ -58,17 +58,26 @@ pub trait DevicePtr<T: ?Sized>: Copy {
     /// Resulting pointer must be in bounds of an allocated buffer.
     unsafe fn add(self, count: usize) -> Self
     where
-        T: Sized;
+        T: Sized,
+    {
+        Self::from_raw(self.as_raw().add(count))
+    }
     /// # Safety
     /// Resulting pointer should not underflow usize.
     /// Resulting pointer must be in bounds of an allocated buffer.
     unsafe fn sub(self, count: usize) -> Self
     where
-        T: Sized;
+        T: Sized,
+    {
+        Self::from_raw(self.as_raw().sub(count))
+    }
     /// # Safety
     /// Resulting pointer should not overflow usize.
     /// Resulting pointer must be in bounds of an allocated buffer.
     unsafe fn offset(self, count: isize) -> Self
     where
-        T: Sized;
+        T: Sized,
+    {
+        Self::from_raw(self.as_raw().offset(count))
+    }
 }

@@ -10,14 +10,19 @@ num-traits = "0.2"
 cust = { version = "0.2", optional = true }
 cust_raw = { version = "0.11", optional = true }
 
+# cublas
+rcublas-sys = { version = "0.5.0", optional = true }
+
 # blas
 blas-src = { version = "0.8" }
 blas-sys = { version = "0.7" }
 
 [features]
-default = ["accelerate"]
+default = ["openblas", "cublas"]
+
 cuda = ["cust", "cust_raw"]
 
+cublas = ["cuda", "rcublas-sys"]
 accelerate = ["blas-src/accelerate"]
 blis = ["blas-src/blis"]
 intel-mkl = ["blas-src/intel-mkl"]

@@ -1,6 +1,8 @@
 use crate::device::Device;
 
 mod cpu;
+#[cfg(feature = "cublas")]
+pub(crate) mod cublas;
 
 #[repr(u8)]
 #[derive(Clone, Copy)]
