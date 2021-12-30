@@ -457,9 +457,9 @@ mod tests {
         let b = a.clone();
         let c = b.clone();
 
-        let mut a = Tensor::from_shape_in((), [2, 2], a); // 3 rows x 2 cols
-        let b = Tensor::from_shape_in((), [2, 2], b); // 2 rows x 2 cols
-        let mut c = Tensor::from_shape_in((), [2, 2], c); // 2 rows x 2 cols
+        let mut a = Tensor::from_shape_in((), [2, 2], a);
+        let b = Tensor::from_shape_in((), [2, 2], b);
+        let mut c = Tensor::from_shape_in((), [2, 2], c);
 
         for _ in 0..1000 {
             gemm(1., a.view(), b.view(), 0., c.view_mut());
@@ -491,9 +491,9 @@ mod tests {
 
             let handle = cuda.init_cublas();
 
-            let mut a = Tensor::from_shape_in(handle, [2, 2], a); // 3 rows x 2 cols
-            let b = Tensor::from_shape_in(handle, [2, 2], b); // 2 rows x 2 cols
-            let mut c = Tensor::from_shape_in(handle, [2, 2], c); // 2 rows x 2 cols
+            let mut a = Tensor::from_shape_in(handle, [2, 2], a);
+            let b = Tensor::from_shape_in(handle, [2, 2], b);
+            let mut c = Tensor::from_shape_in(handle, [2, 2], c);
 
             for _ in 0..1000 {
                 gemm(1., a.view(), b.view(), 0., c.view_mut());

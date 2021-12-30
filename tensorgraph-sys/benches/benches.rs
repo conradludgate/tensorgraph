@@ -22,9 +22,9 @@ pub fn matmul(c: &mut Criterion) {
             let b = a.clone();
             let c = b.clone();
 
-            let mut a = Tensor::from_shape_in((), [256, 256], a); // 3 rows x 2 cols
-            let b = Tensor::from_shape_in((), [256, 256], b); // 2 rows x 2 cols
-            let mut c = Tensor::from_shape_in((), [256, 256], c); // 2 rows x 2 cols
+            let mut a = Tensor::from_shape_in((), [256, 256], a);
+            let b = Tensor::from_shape_in((), [256, 256], b);
+            let mut c = Tensor::from_shape_in((), [256, 256], c);
 
             for _ in 0..1000 {
                 gemm(1., a.view(), b.view(), 0., c.view_mut());
@@ -48,9 +48,9 @@ pub fn matmul(c: &mut Criterion) {
                 let b = a.clone();
                 let c = b.clone();
 
-                let mut a = Tensor::from_shape_in(handle, [256, 256], a); // 3 rows x 2 cols
-                let b = Tensor::from_shape_in(handle, [256, 256], b); // 2 rows x 2 cols
-                let mut c = Tensor::from_shape_in(handle, [256, 256], c); // 2 rows x 2 cols
+                let mut a = Tensor::from_shape_in(handle, [256, 256], a);
+                let b = Tensor::from_shape_in(handle, [256, 256], b);
+                let mut c = Tensor::from_shape_in(handle, [256, 256], c);
 
                 for _ in 0..1000 {
                     gemm(1., a.view(), b.view(), 0., c.view_mut());
