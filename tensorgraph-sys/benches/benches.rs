@@ -1,10 +1,37 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use cust::quick_init;
 use tensorgraph_sys::{
+    blas::{BLASDevice, GEMM},
     device::{cpu::Cpu, Device},
     tensor::{gemm, Tensor},
     vec::Vec,
 };
+
+/// Performs 1000 matrix mulitplications on a 256x256 matrix
+pub fn matmul_1000_256<D: BLASDevice + Clone>(
+    init: &[f64],
+    device: D,
+    ctx: D::Context,
+) -> Vec<f64, D>
+where
+    D::Context: Copy,
+    f64: GEMM<D>,
+{
+    let a = Vec::copy_from_host_in(init, device);
+    let b = a.clone();
+    let c = b.clone();
+
+    let mut a = Tensor::from_shape_in(ctx, [256, 256], a);
+    let b = Tensor::from_shape_in(ctx, [256, 256], b);
+    let mut c = Tensor::from_shape_in(ctx, [256, 256], c);
+
+    for _ in 0..1000 {
+        gemm(1., a.view(), b.view(), 0., c.view_mut());
+        std::mem::swap(&mut a, &mut c);
+    }
+
+    c.into_inner()
+}
 
 pub fn matmul(c: &mut Criterion) {
     let mut group = c.benchmark_group("matmul");
@@ -17,57 +44,24 @@ pub fn matmul(c: &mut Criterion) {
     }
 
     group.bench_function("openblas", |b| {
-        // cpu needs no context
-        let ctx = ();
-
-        b.iter(|| {
-            let a = Vec::<f64, Cpu>::copy_from_host(&init);
-            let b = a.clone();
-            let c = b.clone();
-
-            let mut a = Tensor::from_shape_in(ctx, [256, 256], a);
-            let b = Tensor::from_shape_in(ctx, [256, 256], b);
-            let mut c = Tensor::from_shape_in(ctx, [256, 256], c);
-
-            for _ in 0..1000 {
-                gemm(1., a.view(), b.view(), 0., c.view_mut());
-                std::mem::swap(&mut a, &mut c);
-            }
-
-            black_box(c.into_inner())
-        });
+        b.iter(|| black_box(matmul_1000_256(&init, Cpu::default(), ())));
     });
 
     group.bench_function("cublas", |b| {
         use tensorgraph_sys::device::cuda::Cuda;
+
+        // setup device and cublas contexts
         let cuda_ctx = quick_init().unwrap();
-
         let cuda = Cuda::new(cuda_ctx.get_unowned());
-
-        // cublas handle
         let ctx = cuda.init_cublas();
 
         b.iter(|| {
-            let a = Vec::copy_from_host_in(&init, cuda.clone());
-            let b = a.clone();
-            let c = b.clone();
-
-            let mut a = Tensor::from_shape_in(ctx, [256, 256], a);
-            let b = Tensor::from_shape_in(ctx, [256, 256], b);
-            let mut c = Tensor::from_shape_in(ctx, [256, 256], c);
-
-            for _ in 0..1000 {
-                gemm(1., a.view(), b.view(), 0., c.view_mut());
-                std::mem::swap(&mut a, &mut c);
-            }
-
+            // includes the time to sync data in the benchmark
             let mut out = vec![0.0f64; 256 * 256];
-            Cuda::copy_to_host(&c.into_inner(), &mut out);
+            Cuda::copy_to_host(&matmul_1000_256(&init, cuda.clone(), ctx), &mut out);
 
             black_box(out)
         });
-
-        cust::context::Context::drop(cuda_ctx).unwrap();
     });
 
     group.finish();
