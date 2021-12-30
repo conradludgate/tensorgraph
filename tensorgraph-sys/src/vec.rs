@@ -21,6 +21,18 @@ pub struct Vec<T, D: Device> {
 }
 
 impl<T, D: Device> Vec<T, D> {
+    pub fn copy_from_host_in(slice: &[T], device: D) -> Self
+    where
+        T: Copy,
+    {
+        unsafe {
+            let mut vec = Self::with_capacity_in(slice.len(), device);
+            vec.space_capacity_mut().init_from_host(slice);
+            vec.set_len(slice.len());
+            vec
+        }
+    }
+
     /// # Safety
     /// `buf` must be a valid allocation in `device`, and `len` items must be initialised
     pub unsafe fn from_raw_parts_in(buf: NonNull<[T], D>, len: usize, device: D) -> Self {

@@ -107,7 +107,7 @@ where
 
 impl<S: Storage> Tensor<S, [usize; 2]>
 where
-    S::Device: BLASDevice + Default,
+    S::Device: BLASDevice,
 {
     pub fn dot(
         &self,
@@ -118,9 +118,21 @@ where
         S::Device: Default,
         S::T: GEMM<S::Device>,
     {
+        self.dot_in(rhs, S::Device::default())
+    }
+
+    pub fn dot_in(
+        &self,
+        rhs: Tensor<impl Storage<T = S::T, Device = S::Device>, [usize; 2]>,
+        device: S::Device,
+    ) -> Tensor<Vec<S::T, S::Device>, [usize; 2]>
+    where
+        S::T: Zero + One,
+        S::T: GEMM<S::Device>,
+    {
         let rows = self.shape[1];
         let cols = rhs.shape[0];
-        let mut v = Vec::with_capacity(rows * cols);
+        let mut v = Vec::with_capacity_in(rows * cols, device);
         unsafe {
             let uninit = Tensor::from_shape_in(
                 self.ctx.clone(),
@@ -164,7 +176,7 @@ impl<'a, T: Copy, D: BLASDevice + Default, Dim: Dimension>
     }
 }
 
-pub fn gemm_uninit<F: GEMM<D> + Zero, D: BLASDevice + Default>(
+pub fn gemm_uninit<F: GEMM<D> + Zero, D: BLASDevice>(
     alpha: F,
     a: Tensor<impl Storage<T = F, Device = D>, [usize; 2]>,
     b: Tensor<impl Storage<T = F, Device = D>, [usize; 2]>,
@@ -175,7 +187,7 @@ pub fn gemm_uninit<F: GEMM<D> + Zero, D: BLASDevice + Default>(
     unsafe { gemm(alpha, a, b, F::zero(), c.assume_init()) }
 }
 
-pub fn gemm<F: GEMM<D>, D: BLASDevice + Default>(
+pub fn gemm<F: GEMM<D>, D: BLASDevice>(
     alpha: F,
     a: Tensor<impl Storage<T = F, Device = D>, [usize; 2]>,
     b: Tensor<impl Storage<T = F, Device = D>, [usize; 2]>,
@@ -341,7 +353,7 @@ impl ReduceDim for std::vec::Vec<usize> {
 mod tests {
     use std::ops::Deref;
 
-    use crate::{tensor::Tensor, vec::Vec, device::Device};
+    use crate::{device::Device, tensor::Tensor, vec::Vec};
 
     #[test]
     fn matmul() {
@@ -410,28 +422,23 @@ mod tests {
     #[test]
     fn matmul_cuda() {
         use crate::device::cuda::Cuda;
-        use crate::blas::cublas::ToCublasResult;
 
         let ctx = cust::quick_init().unwrap();
 
+        let cuda = Cuda::new(ctx.get_unowned());
+
         // column major
-        let mut a = Vec::<f32, Cuda>::with_capacity(6);
-        a.space_capacity_mut().init_from_host(&[0., 2., 4., 1., 3., 5.]);
-        unsafe { a.set_len(6); }
+        let a = Vec::copy_from_host_in(&[0., 2., 4., 1., 3., 5.], cuda.clone());
+        let b = Vec::copy_from_host_in(&[0., 2., 1., 3.], cuda.clone());
 
-        let mut b = Vec::<f32, Cuda>::with_capacity(4);
-        b.space_capacity_mut().init_from_host(&[0., 2., 1., 3.]);
-        unsafe { b.set_len(4); }
-
-        let mut handle = std::ptr::null_mut();
-        unsafe { rcublas_sys::cublasCreate_v2(&mut handle).to_cublas_result().unwrap(); }
+        let handle = cuda.init_cublas();
 
         let a = Tensor::from_shape_in(handle, [2, 3], a); // 3 rows x 2 cols
         let b = Tensor::from_shape_in(handle, [2, 2], b); // 2 rows x 2 cols
 
-        let c = a.dot(b);
+        let c = a.dot_in(b, cuda);
 
-        let mut out = vec![0.; 6];
+        let mut out = vec![0.0_f32; 6];
         Cuda::copy_to_host(c.data.deref(), &mut out);
 
         assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
