@@ -13,7 +13,7 @@ impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
         match op {
             super::MatrixOp::NoTrans => rcublas_sys::cublasOperation_t::CUBLAS_OP_N,
             super::MatrixOp::Trans => rcublas_sys::cublasOperation_t::CUBLAS_OP_T,
-            super::MatrixOp::ConjTrans => rcublas_sys::cublasOperation_t::CUBLAS_OP_HERMITAN,
+            // super::MatrixOp::ConjTrans => rcublas_sys::cublasOperation_t::CUBLAS_OP_HERMITAN,
         }
     }
 }

@@ -15,7 +15,9 @@ rcublas-sys = { version = "0.5.0", optional = true }
 
 # blas
 blas-src = { version = "0.8" }
-blas-sys = { version = "0.7" }
+blas-sys = { version = "0.7", optional = true }
+
+matrixmultiply = { version = "0.3", optional = true }
 
 [features]
 default = ["openblas", "cublas"]
@@ -23,11 +25,14 @@ default = ["openblas", "cublas"]
 cuda = ["cust", "cust_raw"]
 
 cublas = ["cuda", "rcublas-sys"]
-accelerate = ["blas-src/accelerate"]
-blis = ["blas-src/blis"]
-intel-mkl = ["blas-src/intel-mkl"]
-netlib = ["blas-src/netlib"]
-openblas = ["blas-src/openblas"]
+
+accelerate = ["blas-sys", "blas-src/accelerate"]
+blis = ["blas-sys", "blas-src/blis"]
+intel-mkl = ["blas-sys", "blas-src/intel-mkl"]
+netlib = ["blas-sys", "blas-src/netlib"]
+openblas = ["blas-sys", "blas-src/openblas"]
+
+matrixmultiply_threading = ["matrixmultiply/threading"]
 
 [dev-dependencies]
 approx = "0.5.0"

@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, Bencher};
 use cust::quick_init;
 use tensorgraph_sys::{
     blas::{BLASDevice, GEMM},
@@ -43,10 +43,23 @@ pub fn matmul(c: &mut Criterion) {
         init[i] = 1.0;
     }
 
-    group.bench_function("openblas", |b| {
+    let cpu = |b: &mut Bencher| {
         b.iter(|| black_box(matmul_1000_256(&init, Cpu::default(), ())));
-    });
+    };
 
+    #[cfg(feature = "openblas")]
+    group.bench_function("openblas", cpu);
+
+    #[cfg(feature = "blis")]
+    group.bench_function("blis", cpu);
+
+    #[cfg(feature = "netlib")]
+    group.bench_function("netlib", cpu);
+
+    #[cfg(feature = "matrixmultiply")]
+    group.bench_function("matrixmultiply", cpu);
+
+    #[cfg(feature = "cublas")]
     group.bench_function("cublas", |b| {
         use tensorgraph_sys::device::cuda::Cuda;
 

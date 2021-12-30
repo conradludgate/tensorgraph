@@ -1,15 +1,21 @@
 use crate::device::Device;
 
-mod cpu;
+#[cfg(feature = "blas-sys")]
+#[allow(clippy::module_inception)]
+mod blas_sys;
+
+#[cfg(feature = "matrixmultiply")]
+mod matmul;
+
 #[cfg(feature = "cublas")]
 pub(crate) mod cublas;
 
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum MatrixOp {
     NoTrans = b'N',
     Trans = b'T',
-    ConjTrans = b'C',
+    // ConjTrans = b'C',
 }
 
 pub trait BLASDevice: Device {
