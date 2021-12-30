@@ -32,10 +32,20 @@ impl<T, D: Device> Slice<T, D> {
         D::Ptr::from_raw(&self.inner as *const [T] as *mut [T])
     }
 
+    /// # Safety
+    /// Slices should always point to properly allocated and initialised memory.
+    /// If any of the slice's values are not initialised or not in an allocated region,
+    /// it may result in undefined behaviour
     pub unsafe fn from_slice_ptr<'a>(ptr: D::Ptr<[T]>) -> &'a Self {
         &*(ptr.as_raw() as *const Self)
     }
 
+    /// # Safety
+    /// Slices should always point to properly allocated and initialised memory.
+    /// If any of the slice's values are not initialised or not in an allocated region,
+    /// it may result in undefined behaviour
+    ///
+    /// Also, you must make sure that only one mut reference is active to this pointer
     pub unsafe fn from_slice_ptr_mut<'a>(ptr: D::Ptr<[T]>) -> &'a mut Self {
         &mut *(ptr.as_raw() as *mut Self)
     }

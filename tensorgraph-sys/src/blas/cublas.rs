@@ -50,7 +50,9 @@ impl GEMM<Cuda> for f32 {
             &beta,
             c.as_raw_mut(),
             ldc,
-        ).to_cublas_result().unwrap();
+        )
+        .to_cublas_result()
+        .unwrap();
     }
 }
 
@@ -86,7 +88,9 @@ impl GEMM<Cuda> for f64 {
             &beta,
             c.as_raw_mut(),
             ldc,
-        ).to_cublas_result().unwrap();
+        )
+        .to_cublas_result()
+        .unwrap();
     }
 }
 
@@ -111,18 +115,19 @@ pub(crate) trait ToCublasResult {
 }
 impl ToCublasResult for rcublas_sys::cublasStatus_t {
     fn to_cublas_result(self) -> CublasResult<()> {
+        use rcublas_sys::cublasStatus_t::*;
         match self {
-            rcublas_sys::cublasStatus_t::CUBLAS_STATUS_SUCCESS => Ok(()),
-            rcublas_sys::cublasStatus_t::CUBLAS_STATUS_NOT_INITIALIZED => Err(CublasError::NotInitialized),
-            rcublas_sys::cublasStatus_t::CUBLAS_STATUS_ALLOC_FAILED => Err(CublasError::AllocFailed),
-            rcublas_sys::cublasStatus_t::CUBLAS_STATUS_INVALID_VALUE => Err(CublasError::InvalidValue),
-            rcublas_sys::cublasStatus_t::CUBLAS_STATUS_ARCH_MISMATCH => Err(CublasError::ArchMismatch),
-            rcublas_sys::cublasStatus_t::CUBLAS_STATUS_MAPPING_ERROR => Err(CublasError::MappingError),
-            rcublas_sys::cublasStatus_t::CUBLAS_STATUS_EXECUTION_FAILED => Err(CublasError::ExecutionFailed),
-            rcublas_sys::cublasStatus_t::CUBLAS_STATUS_INTERNAL_ERROR => Err(CublasError::InternalError),
-            rcublas_sys::cublasStatus_t::CUBLAS_STATUS_NOT_SUPPORTED => Err(CublasError::NotSupported),
-            rcublas_sys::cublasStatus_t::CUBLAS_STATUS_LICENSE_ERROR => Err(CublasError::LicenseError),
-            _ => Err(CublasError::UnexpectedError)
+            CUBLAS_STATUS_SUCCESS => Ok(()),
+            CUBLAS_STATUS_NOT_INITIALIZED => Err(CublasError::NotInitialized),
+            CUBLAS_STATUS_ALLOC_FAILED => Err(CublasError::AllocFailed),
+            CUBLAS_STATUS_INVALID_VALUE => Err(CublasError::InvalidValue),
+            CUBLAS_STATUS_ARCH_MISMATCH => Err(CublasError::ArchMismatch),
+            CUBLAS_STATUS_MAPPING_ERROR => Err(CublasError::MappingError),
+            CUBLAS_STATUS_EXECUTION_FAILED => Err(CublasError::ExecutionFailed),
+            CUBLAS_STATUS_INTERNAL_ERROR => Err(CublasError::InternalError),
+            CUBLAS_STATUS_NOT_SUPPORTED => Err(CublasError::NotSupported),
+            CUBLAS_STATUS_LICENSE_ERROR => Err(CublasError::LicenseError),
+            _ => Err(CublasError::UnexpectedError),
         }
     }
 }

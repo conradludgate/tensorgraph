@@ -303,6 +303,8 @@ pub trait Dimension: AsRef<[usize]> + AsMut<[usize]> + Clone {
     fn len(&self) -> usize {
         self.as_ref().iter().product()
     }
+
+    #[must_use]
     fn column_major_strides(&self) -> Self {
         let mut strides = self.clone();
         let s = strides.as_mut();
@@ -357,7 +359,11 @@ impl ReduceDim for std::vec::Vec<usize> {
 mod tests {
     use std::ops::Deref;
 
-    use crate::{device::Device, tensor::{Tensor, gemm}, vec::Vec};
+    use crate::{
+        device::Device,
+        tensor::{gemm, Tensor},
+        vec::Vec,
+    };
 
     #[test]
     fn matmul() {
@@ -467,7 +473,12 @@ mod tests {
         }
 
         let out = std::vec::Vec::from(c.data);
-        let expected = [1.1278865019586632, 0.5210952168646452, 0.5210952168646452, 1.1273654067417986];
+        let expected = [
+            1.1278865019586632,
+            0.5210952168646452,
+            0.5210952168646452,
+            1.1273654067417986,
+        ];
 
         approx::assert_relative_eq!(out[0], expected[0]);
         approx::assert_relative_eq!(out[1], expected[1]);
@@ -503,7 +514,12 @@ mod tests {
             let mut out = vec![0.; 4];
             Cuda::copy_to_host(c.data.deref(), &mut out);
 
-            let expected = [1.1278865019586632, 0.5210952168646452, 0.5210952168646452, 1.1273654067417986];
+            let expected = [
+                1.1278865019586632,
+                0.5210952168646452,
+                0.5210952168646452,
+                1.1273654067417986,
+            ];
 
             approx::assert_relative_eq!(out[0], expected[0]);
             approx::assert_relative_eq!(out[1], expected[1]);

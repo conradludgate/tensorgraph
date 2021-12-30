@@ -2,7 +2,7 @@ use std::{
     alloc::{Allocator, Layout},
     borrow::Borrow,
     marker::PhantomData,
-    mem::{MaybeUninit, ManuallyDrop},
+    mem::{ManuallyDrop, MaybeUninit},
     ops::{Deref, DerefMut},
 };
 
