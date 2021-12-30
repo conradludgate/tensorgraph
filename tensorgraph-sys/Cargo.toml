@@ -28,3 +28,11 @@ blis = ["blas-src/blis"]
 intel-mkl = ["blas-src/intel-mkl"]
 netlib = ["blas-src/netlib"]
 openblas = ["blas-src/openblas"]
+
+[dev-dependencies]
+approx = "0.5.0"
+criterion = { version = "0.3", features = ["html_reports"] }
+
+[[bench]]
+name = "benches"
+harness = false

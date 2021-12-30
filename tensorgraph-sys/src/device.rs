@@ -41,6 +41,10 @@ pub trait Device {
     fn copy_from_host<T: Copy>(from: &[T], to: &mut Slice<T, Self>);
     fn copy_to_host<T: Copy>(from: &Slice<T, Self>, to: &mut [T]);
     fn copy<T: Copy>(from: &Slice<T, Self>, to: &mut Slice<T, Self>);
+
+    unsafe fn is_cpu() -> bool {
+        false
+    }
 }
 
 pub trait DevicePtr<T: ?Sized>: Copy {

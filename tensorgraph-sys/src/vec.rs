@@ -2,7 +2,7 @@ use std::{
     alloc::{Allocator, Layout},
     borrow::Borrow,
     marker::PhantomData,
-    mem::MaybeUninit,
+    mem::{MaybeUninit, ManuallyDrop},
     ops::{Deref, DerefMut},
 };
 
@@ -20,6 +20,40 @@ pub struct Vec<T, D: Device> {
     _marker: PhantomData<T>,
 }
 
+impl<T, D: Device> Drop for Vec<T, D> {
+    fn drop(&mut self) {
+        unsafe {
+            // drop the data
+            if std::mem::needs_drop::<T>() {
+                // we are on the CPU
+                if D::is_cpu() {
+                    let slice = &mut *(self.buf.as_ptr().as_raw());
+                    let slice = &mut slice[..self.len];
+                    for i in slice {
+                        std::ptr::drop_in_place(i);
+                    }
+                } else {
+                    panic!("drop types should not be initialised outside of the CPU")
+                }
+            }
+            let (layout, _) = Layout::new::<T>().repeat(self.capacity()).unwrap();
+            self.device.deallocate(self.buf.cast(), layout)
+        }
+    }
+}
+
+impl<T: Copy, D: Device + Clone> Clone for Vec<T, D> {
+    fn clone(&self) -> Self {
+        let slice = self.deref();
+        unsafe {
+            let mut vec = Self::with_capacity_in(slice.len(), self.device.clone());
+            vec.space_capacity_mut().init_from_slice(slice);
+            vec.set_len(slice.len());
+            vec
+        }
+    }
+}
+
 impl<T, D: Device> Vec<T, D> {
     pub fn copy_from_host_in(slice: &[T], device: D) -> Self
     where
@@ -31,6 +65,14 @@ impl<T, D: Device> Vec<T, D> {
             vec.set_len(slice.len());
             vec
         }
+    }
+
+    pub fn copy_from_host(slice: &[T]) -> Self
+    where
+        T: Copy,
+        D: Default,
+    {
+        Self::copy_from_host_in(slice, D::default())
     }
 
     /// # Safety
@@ -136,16 +178,11 @@ impl<T, A: Allocator> From<std::vec::Vec<T, A>> for Vec<T, Cpu<A>> {
 impl<T, A: Allocator> From<Vec<T, Cpu<A>>> for std::vec::Vec<T, A> {
     fn from(v: Vec<T, Cpu<A>>) -> Self {
         unsafe {
-            let Vec {
-                device,
-                buf,
-                len,
-                _marker: _,
-            } = v;
-            let alloc = device.alloc();
-            let (ptr, cap) = buf.as_ptr().to_raw_parts();
+            let v = ManuallyDrop::new(v);
+            let alloc = std::ptr::read(&v.device).alloc();
+            let (ptr, cap) = v.buf.as_ptr().to_raw_parts();
             let ptr = ptr.cast();
-            Self::from_raw_parts_in(ptr, len, cap, alloc)
+            Self::from_raw_parts_in(ptr, v.len, cap, alloc)
         }
     }
 }

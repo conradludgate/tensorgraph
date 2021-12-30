@@ -8,7 +8,7 @@ use crate::ptr::slice::Slice;
 use super::{Device, DevicePtr, NonNull};
 
 #[derive(Clone, Copy)]
-pub struct Cpu<A: Allocator> {
+pub struct Cpu<A: Allocator = Global> {
     alloc: A,
 }
 
@@ -86,6 +86,10 @@ impl<A: Allocator> Device for Cpu<A> {
 
     fn copy<T: Copy>(from: &Slice<T, Self>, to: &mut Slice<T, Self>) {
         to.deref_mut().copy_from_slice(from.deref())
+    }
+
+    unsafe fn is_cpu() -> bool {
+        true
     }
 }
 

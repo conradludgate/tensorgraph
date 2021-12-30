@@ -35,6 +35,10 @@ where
         }
     }
 
+    pub fn into_inner(self) -> S {
+        self.data
+    }
+
     pub fn reverse_axes(&mut self) {
         self.shape.as_mut().reverse();
         self.strides.as_mut().reverse();
@@ -353,7 +357,7 @@ impl ReduceDim for std::vec::Vec<usize> {
 mod tests {
     use std::ops::Deref;
 
-    use crate::{device::Device, tensor::Tensor, vec::Vec};
+    use crate::{device::Device, tensor::{Tensor, gemm}, vec::Vec};
 
     #[test]
     fn matmul() {
@@ -442,6 +446,70 @@ mod tests {
         Cuda::copy_to_host(c.data.deref(), &mut out);
 
         assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
+
+        cust::context::Context::drop(ctx).unwrap();
+    }
+
+    #[test]
+    fn matmul2() {
+        // column major
+        let a = Vec::copy_from_host(&[0.001, 1.0, 1.0, 0.]);
+        let b = a.clone();
+        let c = b.clone();
+
+        let mut a = Tensor::from_shape_in((), [2, 2], a); // 3 rows x 2 cols
+        let b = Tensor::from_shape_in((), [2, 2], b); // 2 rows x 2 cols
+        let mut c = Tensor::from_shape_in((), [2, 2], c); // 2 rows x 2 cols
+
+        for _ in 0..1000 {
+            gemm(1., a.view(), b.view(), 0., c.view_mut());
+            std::mem::swap(&mut a, &mut c);
+        }
+
+        let out = std::vec::Vec::from(c.data);
+        let expected = [1.1278865019586632, 0.5210952168646452, 0.5210952168646452, 1.1273654067417986];
+
+        approx::assert_relative_eq!(out[0], expected[0]);
+        approx::assert_relative_eq!(out[1], expected[1]);
+        approx::assert_relative_eq!(out[2], expected[2]);
+        approx::assert_relative_eq!(out[3], expected[3]);
+    }
+
+    #[test]
+    fn matmul_cuda2() {
+        use crate::device::cuda::Cuda;
+
+        let ctx = cust::quick_init().unwrap();
+
+        {
+            let cuda = Cuda::new(ctx.get_unowned());
+
+            // column major
+            let a = Vec::copy_from_host_in(&[0.001, 1.0, 1.0, 0.], cuda.clone());
+            let b = a.clone();
+            let c = b.clone();
+
+            let handle = cuda.init_cublas();
+
+            let mut a = Tensor::from_shape_in(handle, [2, 2], a); // 3 rows x 2 cols
+            let b = Tensor::from_shape_in(handle, [2, 2], b); // 2 rows x 2 cols
+            let mut c = Tensor::from_shape_in(handle, [2, 2], c); // 2 rows x 2 cols
+
+            for _ in 0..1000 {
+                gemm(1., a.view(), b.view(), 0., c.view_mut());
+                std::mem::swap(&mut a, &mut c);
+            }
+
+            let mut out = vec![0.; 4];
+            Cuda::copy_to_host(c.data.deref(), &mut out);
+
+            let expected = [1.1278865019586632, 0.5210952168646452, 0.5210952168646452, 1.1273654067417986];
+
+            approx::assert_relative_eq!(out[0], expected[0]);
+            approx::assert_relative_eq!(out[1], expected[1]);
+            approx::assert_relative_eq!(out[2], expected[2]);
+            approx::assert_relative_eq!(out[3], expected[3]);
+        }
 
         cust::context::Context::drop(ctx).unwrap();
     }
