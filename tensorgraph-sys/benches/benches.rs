@@ -17,14 +17,18 @@ pub fn matmul(c: &mut Criterion) {
     }
 
     group.bench_function("openblas", |b| {
+        // cpu needs no context
+        let ctx = ();
+
         b.iter(|| {
             let a = Vec::<f64, Cpu>::copy_from_host(&init);
             let b = a.clone();
             let c = b.clone();
 
-            let mut a = Tensor::from_shape_in((), [256, 256], a);
-            let b = Tensor::from_shape_in((), [256, 256], b);
-            let mut c = Tensor::from_shape_in((), [256, 256], c);
+
+            let mut a = Tensor::from_shape_in(ctx, [256, 256], a);
+            let b = Tensor::from_shape_in(ctx, [256, 256], b);
+            let mut c = Tensor::from_shape_in(ctx, [256, 256], c);
 
             for _ in 0..1000 {
                 gemm(1., a.view(), b.view(), 0., c.view_mut());
@@ -37,20 +41,22 @@ pub fn matmul(c: &mut Criterion) {
 
     {
         use tensorgraph_sys::device::cuda::Cuda;
-        let ctx = quick_init().unwrap();
+        let cuda_ctx = quick_init().unwrap();
 
-        let cuda = Cuda::new(ctx.get_unowned());
-        let handle = cuda.init_cublas();
+        let cuda = Cuda::new(cuda_ctx.get_unowned());
 
         group.bench_function("cublas", |b| {
+            // cublas handle
+            let ctx = cuda.init_cublas();
+
             b.iter(|| {
                 let a = Vec::copy_from_host_in(&init, cuda.clone());
                 let b = a.clone();
                 let c = b.clone();
 
-                let mut a = Tensor::from_shape_in(handle, [256, 256], a);
-                let b = Tensor::from_shape_in(handle, [256, 256], b);
-                let mut c = Tensor::from_shape_in(handle, [256, 256], c);
+                let mut a = Tensor::from_shape_in(ctx, [256, 256], a);
+                let b = Tensor::from_shape_in(ctx, [256, 256], b);
+                let mut c = Tensor::from_shape_in(ctx, [256, 256], c);
 
                 for _ in 0..1000 {
                     gemm(1., a.view(), b.view(), 0., c.view_mut());
@@ -64,7 +70,7 @@ pub fn matmul(c: &mut Criterion) {
             })
         });
 
-        cust::context::Context::drop(ctx).unwrap();
+        cust::context::Context::drop(cuda_ctx).unwrap();
     }
 
     group.finish();
