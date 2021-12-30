@@ -25,6 +25,32 @@ pub fn matmul(c: &mut Criterion) {
             let b = a.clone();
             let c = b.clone();
 
+            let mut a = Tensor::from_shape_in(ctx, [256, 256], a);
+            let b = Tensor::from_shape_in(ctx, [256, 256], b);
+            let mut c = Tensor::from_shape_in(ctx, [256, 256], c);
+
+            for _ in 0..1000 {
+                gemm(1., a.view(), b.view(), 0., c.view_mut());
+                std::mem::swap(&mut a, &mut c);
+            }
+
+            black_box(c.into_inner())
+        });
+    });
+
+    group.bench_function("cublas", |b| {
+        use tensorgraph_sys::device::cuda::Cuda;
+        let cuda_ctx = quick_init().unwrap();
+
+        let cuda = Cuda::new(cuda_ctx.get_unowned());
+
+        // cublas handle
+        let ctx = cuda.init_cublas();
+
+        b.iter(|| {
+            let a = Vec::copy_from_host_in(&init, cuda.clone());
+            let b = a.clone();
+            let c = b.clone();
 
             let mut a = Tensor::from_shape_in(ctx, [256, 256], a);
             let b = Tensor::from_shape_in(ctx, [256, 256], b);
@@ -35,43 +61,14 @@ pub fn matmul(c: &mut Criterion) {
                 std::mem::swap(&mut a, &mut c);
             }
 
-            black_box(c.into_inner());
-        })
-    });
+            let mut out = vec![0.0f64; 256 * 256];
+            Cuda::copy_to_host(&c.into_inner(), &mut out);
 
-    {
-        use tensorgraph_sys::device::cuda::Cuda;
-        let cuda_ctx = quick_init().unwrap();
-
-        let cuda = Cuda::new(cuda_ctx.get_unowned());
-
-        group.bench_function("cublas", |b| {
-            // cublas handle
-            let ctx = cuda.init_cublas();
-
-            b.iter(|| {
-                let a = Vec::copy_from_host_in(&init, cuda.clone());
-                let b = a.clone();
-                let c = b.clone();
-
-                let mut a = Tensor::from_shape_in(ctx, [256, 256], a);
-                let b = Tensor::from_shape_in(ctx, [256, 256], b);
-                let mut c = Tensor::from_shape_in(ctx, [256, 256], c);
-
-                for _ in 0..1000 {
-                    gemm(1., a.view(), b.view(), 0., c.view_mut());
-                    std::mem::swap(&mut a, &mut c);
-                }
-
-                let mut out = vec![0.0f64; 256 * 256];
-                Cuda::copy_to_host(&c.into_inner(), &mut out);
-
-                black_box(out);
-            })
+            black_box(out)
         });
 
         cust::context::Context::drop(cuda_ctx).unwrap();
-    }
+    });
 
     group.finish();
 }
