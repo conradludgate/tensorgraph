@@ -154,3 +154,27 @@ where
         unsafe { &mut *(&mut self.inner[index] as *mut [T] as *mut Self) }
     }
 }
+
+impl<T, A: Allocator, const N: usize> AsRef<Slice<T, Cpu<A>>> for [T; N] {
+    fn as_ref(&self) -> &Slice<T, Cpu<A>> {
+        unsafe { &*(self.as_slice() as *const [T] as *const Slice<T, Cpu<A>>) }
+    }
+}
+
+impl<T, A: Allocator, const N: usize> AsMut<Slice<T, Cpu<A>>> for [T; N] {
+    fn as_mut(&mut self) -> &mut Slice<T, Cpu<A>> {
+        unsafe { &mut *(self.as_mut_slice() as *mut [T] as *mut Slice<T, Cpu<A>>) }
+    }
+}
+
+impl<T, A: Allocator> AsRef<Slice<T, Cpu<A>>> for std::vec::Vec<T, A> {
+    fn as_ref(&self) -> &Slice<T, Cpu<A>> {
+        unsafe { &*(self.as_slice() as *const [T] as *const Slice<T, Cpu<A>>) }
+    }
+}
+
+impl<T, A: Allocator> AsMut<Slice<T, Cpu<A>>> for std::vec::Vec<T, A> {
+    fn as_mut(&mut self) -> &mut Slice<T, Cpu<A>> {
+        unsafe { &mut *(self.as_mut_slice() as *mut [T] as *mut Slice<T, Cpu<A>>) }
+    }
+}

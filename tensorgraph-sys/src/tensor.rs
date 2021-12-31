@@ -4,8 +4,9 @@ use num_traits::{One, Zero};
 
 use crate::{
     blas::{BLASDevice, MatrixOp, GEMM},
-    device::Device,
+    dims::{Dimension, ReduceDim},
     ptr::slice::Slice,
+    storage::{IntoOwned, Storage, StorageMut},
     vec::Vec,
 };
 
@@ -33,6 +34,13 @@ where
             data,
             ctx,
         }
+    }
+
+    pub fn from_shape(shape: Dim, data: S) -> Self
+    where
+        <S::Device as BLASDevice>::Context: Default,
+    {
+        Self::from_shape_in(Default::default(), shape, data)
     }
 
     pub fn into_inner(self) -> S {
@@ -246,115 +254,6 @@ fn lead(s: [usize; 2]) -> (MatrixOp, i32) {
     }
 }
 
-pub trait IntoOwned {
-    type Owned;
-    fn into_owned(self) -> Self::Owned;
-}
-
-pub trait Storage: AsRef<Slice<Self::T, Self::Device>> {
-    type T;
-    type Device: Device;
-}
-
-pub trait StorageMut: Storage + AsMut<Slice<Self::T, Self::Device>> {}
-
-impl<T, D: Device> IntoOwned for Vec<T, D> {
-    type Owned = Self;
-    fn into_owned(self) -> Self::Owned {
-        self
-    }
-}
-
-impl<'a, T: Copy, D: Device + Default> IntoOwned for &'a Slice<T, D> {
-    type Owned = Vec<T, D>;
-    fn into_owned(self) -> Self::Owned {
-        self.to_owned()
-    }
-}
-
-impl<'a, T: Copy, D: Device + Default> IntoOwned for &'a mut Slice<T, D> {
-    type Owned = Vec<T, D>;
-    fn into_owned(self) -> Self::Owned {
-        self.to_owned()
-    }
-}
-
-impl<T, D: Device> Storage for Vec<T, D> {
-    type T = T;
-    type Device = D;
-}
-
-impl<'a, T, D: Device> Storage for &'a Slice<T, D> {
-    type T = T;
-    type Device = D;
-}
-
-impl<'a, T, D: Device> Storage for &'a mut Slice<T, D> {
-    type T = T;
-    type Device = D;
-}
-
-impl<'a, T, D: Device> StorageMut for Vec<T, D> {}
-
-impl<'a, T, D: Device> StorageMut for &'a mut Slice<T, D> {}
-
-#[allow(clippy::len_without_is_empty)]
-pub trait Dimension: AsRef<[usize]> + AsMut<[usize]> + Clone {
-    fn len(&self) -> usize {
-        self.as_ref().iter().product()
-    }
-
-    #[must_use]
-    fn column_major_strides(&self) -> Self {
-        let mut strides = self.clone();
-        let s = strides.as_mut();
-        s[0] = 1;
-
-        for i in 1..s.len() {
-            s[i] = s[i - 1] * self.as_ref()[i - 1];
-        }
-
-        strides
-    }
-}
-
-pub trait ReduceDim: Dimension {
-    type Smaller: Dimension;
-    fn remove(&self, axis: usize) -> (Self::Smaller, usize);
-}
-
-impl<const N: usize> Dimension for [usize; N] {}
-impl Dimension for std::vec::Vec<usize> {}
-
-impl<const N: usize> ReduceDim for [usize; N]
-where
-    [(); N - 1]: Sized,
-{
-    type Smaller = [usize; N - 1];
-    fn remove(&self, axis: usize) -> (Self::Smaller, usize) {
-        assert!(axis < N);
-        if N == 1 {
-            return ([0_usize; N - 1], self[0]);
-        }
-
-        let mut new = [0; N - 1];
-        let (lhs, rhs) = self.split_at(axis);
-        let (n, rhs) = rhs.split_first().unwrap();
-        new[..axis].copy_from_slice(lhs);
-        new[axis..].copy_from_slice(rhs);
-        (new, *n)
-    }
-}
-
-impl ReduceDim for std::vec::Vec<usize> {
-    type Smaller = Self;
-    fn remove(&self, axis: usize) -> (Self::Smaller, usize) {
-        let mut new = self.clone();
-        let n = std::vec::Vec::remove(&mut new, axis);
-        (new, n)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::ops::Deref;
@@ -367,39 +266,64 @@ mod tests {
 
     #[test]
     fn matmul() {
-        // column major
-        let a: Vec<f32, _> = Vec::from(vec![0., 2., 4., 1., 3., 5.]);
-        let b: Vec<f32, _> = Vec::from(vec![0., 2., 1., 3.]);
-        let a = Tensor::from_shape_in((), [3, 2], a); // 3 rows x 2 cols
-        let b = Tensor::from_shape_in((), [2, 2], b); // 2 rows x 2 cols
+        //     0 1
+        // A = 2 3
+        //     4 5
+
+        // B = 0 1
+        //     2 3
+
+        // column major (read each column first)
+        let a = [0., 2., 4., 1., 3., 5.];
+        let b = [0., 2., 1., 3.];
+        let a = Tensor::from_shape([3, 2], a); // 3 rows x 2 cols
+        let b = Tensor::from_shape([2, 2], b); // 2 rows x 2 cols
+
+        //           2  3
+        // C = AB =  6 11
+        //          10 19
 
         let c = a.dot(b);
-
-        assert_eq!(std::vec::Vec::from(c.data), vec![2., 6., 10., 3., 11., 19.]);
+        assert_eq!(c.into_inner().into_std(), [2., 6., 10., 3., 11., 19.]);
     }
 
     #[test]
     fn matmul_t() {
-        let a: Vec<f32, _> = Vec::from(vec![1., 2., 3., 4.]);
-        let b: Vec<f32, _> = Vec::from(vec![5., 6., 7., 8.]);
-        let a = Tensor::from_shape_in((), [2, 2], a);
-        let b = Tensor::from_shape_in((), [2, 2], b);
+        // A = 1 3
+        //     2 4
+
+        // B = 5 7
+        //     6 8
+
+        let a = [1., 2., 3., 4.];
+        let b = [5., 6., 7., 8.];
+        let a = Tensor::from_shape([2, 2], a);
+        let b = Tensor::from_shape([2, 2], b);
+
+        // C1 = A^B^ = 19 22
+        //             43 50
 
         let c1 = a.t().dot(b.t());
-        assert_eq!(std::vec::Vec::from(c1.data), vec![19.0, 43.0, 22.0, 50.0]);
+        assert_eq!(c1.into_inner().into_std(), [19.0, 43.0, 22.0, 50.0]);
+
+        // C2 = AB^ = 26 30
+        //            38 44
 
         let c2 = a.dot(b.t());
-        assert_eq!(std::vec::Vec::from(c2.data), vec![26.0, 38.0, 30.0, 44.0]);
+        assert_eq!(c2.into_inner().into_std(), [26.0, 38.0, 30.0, 44.0]);
+
+        // C3 = A^B = 17 23
+        //            39 53
 
         let c3 = a.t().dot(b);
-        assert_eq!(std::vec::Vec::from(c3.data), vec![17.0, 39.0, 23.0, 53.0]);
+        assert_eq!(c3.into_inner().into_std(), [17.0, 39.0, 23.0, 53.0]);
     }
 
     #[test]
     fn slice() {
         // column major
-        let a: Vec<f32, _> = Vec::from(vec![0., 1., 2., 3., 4., 5.]);
-        let a = Tensor::from_shape_in((), [2, 3], a);
+        let a = [0., 1., 2., 3., 4., 5.];
+        let a = Tensor::from_shape([2, 3], a);
 
         // axis 0 (columns)
         let a00 = a.slice_axis(0, 0);
@@ -412,7 +336,7 @@ mod tests {
         assert_eq!(a01.shape, [3]);
         assert_eq!(a01.strides, [2]);
 
-        // acis 1 (rows)
+        // axis 1 (rows)
         let a10 = a.slice_axis(1, 0);
         assert_eq!(a10.data.deref(), [0., 1., 2., 3., 4., 5.]); // represents 0, 1
         assert_eq!(a10.shape, [2]);
@@ -433,46 +357,46 @@ mod tests {
     fn matmul_cuda() {
         use crate::device::cuda::Cuda;
 
-        let ctx = cust::quick_init().unwrap();
+        let cuda_ctx = cust::quick_init().unwrap();
 
-        let cuda = Cuda::new(ctx.get_unowned());
+        {
+            let cuda = Cuda::new(cuda_ctx.get_unowned());
 
-        // column major
-        let a = Vec::copy_from_host_in(&[0., 2., 4., 1., 3., 5.], cuda.clone());
-        let b = Vec::copy_from_host_in(&[0., 2., 1., 3.], cuda.clone());
+            // column major
+            let a = Vec::copy_from_host_in(&[0., 2., 4., 1., 3., 5.], cuda.clone());
+            let b = Vec::copy_from_host_in(&[0., 2., 1., 3.], cuda.clone());
 
-        let handle = cuda.init_cublas();
+            let ctx = cuda.init_cublas();
 
-        let a = Tensor::from_shape_in(handle, [2, 3], a); // 3 rows x 2 cols
-        let b = Tensor::from_shape_in(handle, [2, 2], b); // 2 rows x 2 cols
+            let a = Tensor::from_shape_in(ctx, [3, 2], a);
+            let b = Tensor::from_shape_in(ctx, [2, 2], b);
 
-        let c = a.dot_in(b, cuda);
+            let c = a.dot_in(b, cuda);
 
-        let mut out = vec![0.0_f32; 6];
-        Cuda::copy_to_host(c.data.deref(), &mut out);
+            let mut out = vec![0.0_f32; 6];
+            Cuda::copy_to_host(c.data.deref(), &mut out);
 
-        assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
-
-        cust::context::Context::drop(ctx).unwrap();
+            assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
+        }
     }
 
     #[test]
     fn matmul2() {
         // column major
-        let a = Vec::copy_from_host(&[0.001, 1.0, 1.0, 0.]);
-        let b = a.clone();
-        let c = b.clone();
+        let a = [0.001, 1.0, 1.0, 0.];
+        let b = a;
+        let c = [0.; 4];
 
-        let mut a = Tensor::from_shape_in((), [2, 2], a);
-        let b = Tensor::from_shape_in((), [2, 2], b);
-        let mut c = Tensor::from_shape_in((), [2, 2], c);
+        let mut a = Tensor::from_shape([2, 2], a);
+        let b = Tensor::from_shape([2, 2], b);
+        let mut c = Tensor::from_shape([2, 2], c);
 
         for _ in 0..1000 {
             gemm(1., a.view(), b.view(), 0., c.view_mut());
             std::mem::swap(&mut a, &mut c);
         }
 
-        let out = std::vec::Vec::from(c.data);
+        let out = c.into_inner();
         let expected = [
             1.1278865019586632,
             0.5210952168646452,

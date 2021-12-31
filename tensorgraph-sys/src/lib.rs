@@ -15,3 +15,6 @@ pub mod device;
 pub mod ptr;
 pub mod tensor;
 pub mod vec;
+pub mod zero;
+pub mod storage;
+pub mod dims;

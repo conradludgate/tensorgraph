@@ -9,9 +9,10 @@ use std::{
 use crate::{
     device::{cpu::Cpu, Device, DevicePtr},
     ptr::{non_null::NonNull, slice::Slice},
+    zero::Zero,
 };
 
-pub struct Vec<T, D: Device> {
+pub struct Vec<T, D: Device = Cpu> {
     device: D,
     buf: NonNull<[T], D>,
     len: usize,
@@ -55,6 +56,26 @@ impl<T: Copy, D: Device + Clone> Clone for Vec<T, D> {
 }
 
 impl<T, D: Device> Vec<T, D> {
+    pub fn zeroed_in(len: usize, device: D) -> Self
+    where
+        T: Zero,
+    {
+        unsafe {
+            let (layout, _) = Layout::new::<T>().repeat(len).unwrap();
+            let data = device.allocate_zeroed(layout).unwrap().cast();
+            let buf = NonNull::slice_from_raw_parts(data, len);
+            Self::from_raw_parts_in(buf, len, device)
+        }
+    }
+
+    pub fn zeroed(len: usize) -> Self
+    where
+        T: Zero,
+        D: Default,
+    {
+        Self::zeroed_in(len, D::default())
+    }
+
     pub fn copy_from_host_in(slice: &[T], device: D) -> Self
     where
         T: Copy,
@@ -184,6 +205,12 @@ impl<T, A: Allocator> From<Vec<T, Cpu<A>>> for std::vec::Vec<T, A> {
             let ptr = ptr.cast();
             Self::from_raw_parts_in(ptr, v.len, cap, alloc)
         }
+    }
+}
+
+impl<T, A: Allocator> Vec<T, Cpu<A>> {
+    pub fn into_std(self) -> std::vec::Vec<T, A> {
+        self.into()
     }
 }
 
