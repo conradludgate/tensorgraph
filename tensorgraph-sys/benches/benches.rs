@@ -1,5 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Bencher};
-use cust::quick_init;
+use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use tensorgraph_sys::{
     blas::{BLASDevice, GEMM},
     device::{cpu::Cpu, Device},
@@ -61,17 +60,18 @@ pub fn matmul(c: &mut Criterion) {
 
     #[cfg(feature = "cublas")]
     group.bench_function("cublas", |b| {
-        use tensorgraph_sys::device::cuda::Cuda;
+        use tensorgraph_sys::device::cuda::{Context, Cuda, Stream};
 
         // setup device and cublas contexts
-        let cuda_ctx = quick_init().unwrap();
-        let cuda = Cuda::new(cuda_ctx.get_unowned());
+        let cuda_ctx = Context::quick_init().unwrap();
+        let cuda_stream = Stream::new().unwrap();
+        let cuda = Cuda::new(cuda_ctx.share(), cuda_stream.share());
         let ctx = cuda.init_cublas();
 
         b.iter(|| {
             // includes the time to sync data in the benchmark
             let mut out = vec![0.0f64; 256 * 256];
-            Cuda::copy_to_host(&matmul_1000_256(&init, cuda.clone(), ctx), &mut out);
+            Cuda::copy_to_host(&matmul_1000_256(&init, cuda, ctx), &mut out);
 
             black_box(out)
         });

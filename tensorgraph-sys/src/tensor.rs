@@ -4,7 +4,7 @@ use num_traits::{One, Zero};
 
 use crate::{
     blas::{BLASDevice, MatrixOp, GEMM},
-    dims::{Dimension, ReduceDim},
+    dims::{Dimension, RemoveDim},
     ptr::slice::Slice,
     storage::{IntoOwned, Storage, StorageMut},
     vec::Vec,
@@ -99,7 +99,7 @@ where
 
     pub fn slice_axis(&self, axis: usize, n: usize) -> Tensor<&Slice<S::T, S::Device>, Dim::Smaller>
     where
-        Dim: ReduceDim,
+        Dim: RemoveDim,
     {
         assert!(axis < self.shape.as_ref().len());
 
@@ -355,29 +355,28 @@ mod tests {
 
     #[test]
     fn matmul_cuda() {
-        use crate::device::cuda::Cuda;
+        use crate::device::cuda::{Context, Cuda, Stream};
 
-        let cuda_ctx = cust::quick_init().unwrap();
+        let cuda_ctx = Context::quick_init().unwrap();
+        let cuda_stream = Stream::new().unwrap();
 
-        {
-            let cuda = Cuda::new(cuda_ctx.get_unowned());
+        let cuda = Cuda::new(cuda_ctx.share(), cuda_stream.share());
 
-            // column major
-            let a = Vec::copy_from_host_in(&[0., 2., 4., 1., 3., 5.], cuda.clone());
-            let b = Vec::copy_from_host_in(&[0., 2., 1., 3.], cuda.clone());
+        // column major
+        let a = Vec::copy_from_host_in(&[0., 2., 4., 1., 3., 5.], cuda);
+        let b = Vec::copy_from_host_in(&[0., 2., 1., 3.], cuda);
 
-            let ctx = cuda.init_cublas();
+        let ctx = cuda.init_cublas();
 
-            let a = Tensor::from_shape_in(ctx, [3, 2], a);
-            let b = Tensor::from_shape_in(ctx, [2, 2], b);
+        let a = Tensor::from_shape_in(ctx, [3, 2], a);
+        let b = Tensor::from_shape_in(ctx, [2, 2], b);
 
-            let c = a.dot_in(b, cuda);
+        let c = a.dot_in(b, cuda);
 
-            let mut out = vec![0.0_f32; 6];
-            Cuda::copy_to_host(c.data.deref(), &mut out);
+        let mut out = vec![0.0_f32; 6];
+        Cuda::copy_to_host(c.data.deref(), &mut out);
 
-            assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
-        }
+        assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
     }
 
     #[test]
@@ -412,45 +411,42 @@ mod tests {
 
     #[test]
     fn matmul_cuda2() {
-        use crate::device::cuda::Cuda;
+        use crate::device::cuda::{Context, Cuda, Stream};
 
-        let ctx = cust::quick_init().unwrap();
+        let cuda_ctx = Context::quick_init().unwrap();
+        let cuda_stream = Stream::new().unwrap();
 
-        {
-            let cuda = Cuda::new(ctx.get_unowned());
+        let cuda = Cuda::new(cuda_ctx.share(), cuda_stream.share());
 
-            // column major
-            let a = Vec::copy_from_host_in(&[0.001, 1.0, 1.0, 0.], cuda.clone());
-            let b = a.clone();
-            let c = b.clone();
+        // column major
+        let a = Vec::copy_from_host_in(&[0.001, 1.0, 1.0, 0.], cuda);
+        let b = a.clone();
+        let c = b.clone();
 
-            let handle = cuda.init_cublas();
+        let ctx = cuda.init_cublas();
 
-            let mut a = Tensor::from_shape_in(handle, [2, 2], a);
-            let b = Tensor::from_shape_in(handle, [2, 2], b);
-            let mut c = Tensor::from_shape_in(handle, [2, 2], c);
+        let mut a = Tensor::from_shape_in(ctx, [2, 2], a);
+        let b = Tensor::from_shape_in(ctx, [2, 2], b);
+        let mut c = Tensor::from_shape_in(ctx, [2, 2], c);
 
-            for _ in 0..1000 {
-                gemm(1., a.view(), b.view(), 0., c.view_mut());
-                std::mem::swap(&mut a, &mut c);
-            }
-
-            let mut out = vec![0.; 4];
-            Cuda::copy_to_host(c.data.deref(), &mut out);
-
-            let expected = [
-                1.1278865019586632,
-                0.5210952168646452,
-                0.5210952168646452,
-                1.1273654067417986,
-            ];
-
-            approx::assert_relative_eq!(out[0], expected[0]);
-            approx::assert_relative_eq!(out[1], expected[1]);
-            approx::assert_relative_eq!(out[2], expected[2]);
-            approx::assert_relative_eq!(out[3], expected[3]);
+        for _ in 0..1000 {
+            gemm(1., a.view(), b.view(), 0., c.view_mut());
+            std::mem::swap(&mut a, &mut c);
         }
 
-        cust::context::Context::drop(ctx).unwrap();
+        let mut out = vec![0.; 4];
+        Cuda::copy_to_host(c.data.deref(), &mut out);
+
+        let expected = [
+            1.1278865019586632,
+            0.5210952168646452,
+            0.5210952168646452,
+            1.1273654067417986,
+        ];
+
+        approx::assert_relative_eq!(out[0], expected[0]);
+        approx::assert_relative_eq!(out[1], expected[1]);
+        approx::assert_relative_eq!(out[2], expected[2]);
+        approx::assert_relative_eq!(out[3], expected[3]);
     }
 }

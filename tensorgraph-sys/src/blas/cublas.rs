@@ -1,11 +1,30 @@
 use cust::memory::DevicePointer;
+use rcublas_sys::{
+    cublasCreate_v2, cublasDgemm_v2, cublasSetStream_v2, cublasSgemm_v2, cublasStatus_t,
+    cudaStream_t,
+};
 
 use crate::device::cuda::Cuda;
 
 use super::{BLASDevice, GEMM};
 
-impl BLASDevice for Cuda {
-    type Context = rcublas_sys::cublasHandle_t;
+#[derive(Clone, Copy)]
+pub struct CublasContext(rcublas_sys::cublasHandle_t);
+
+impl CublasContext {
+    pub(crate) unsafe fn new(stream: cudaStream_t) -> Self {
+        let mut handle = std::ptr::null_mut();
+        cublasCreate_v2(&mut handle).to_cublas_result().unwrap();
+
+        cublasSetStream_v2(handle, stream)
+            .to_cublas_result()
+            .unwrap();
+        Self(handle)
+    }
+}
+
+impl<'a> BLASDevice for Cuda<'a> {
+    type Context = CublasContext;
 }
 
 impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
@@ -18,9 +37,9 @@ impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
     }
 }
 
-impl GEMM<Cuda> for f32 {
+impl<'a> GEMM<Cuda<'a>> for f32 {
     unsafe fn gemm(
-        handle: rcublas_sys::cublasHandle_t,
+        handle: CublasContext,
         transa: super::MatrixOp,
         transb: super::MatrixOp,
         m: i32,
@@ -35,8 +54,8 @@ impl GEMM<Cuda> for f32 {
         mut c: DevicePointer<f32>,
         ldc: i32,
     ) {
-        rcublas_sys::cublasSgemm_v2(
-            handle,
+        cublasSgemm_v2(
+            handle.0,
             transa.into(),
             transb.into(),
             m,
@@ -56,9 +75,9 @@ impl GEMM<Cuda> for f32 {
     }
 }
 
-impl GEMM<Cuda> for f64 {
+impl<'a> GEMM<Cuda<'a>> for f64 {
     unsafe fn gemm(
-        handle: rcublas_sys::cublasHandle_t,
+        handle: CublasContext,
         transa: super::MatrixOp,
         transb: super::MatrixOp,
         m: i32,
@@ -73,8 +92,8 @@ impl GEMM<Cuda> for f64 {
         mut c: DevicePointer<f64>,
         ldc: i32,
     ) {
-        rcublas_sys::cublasDgemm_v2(
-            handle,
+        cublasDgemm_v2(
+            handle.0,
             transa.into(),
             transb.into(),
             m,
@@ -113,9 +132,9 @@ pub(crate) type CublasResult<T, E = CublasError> = Result<T, E>;
 pub(crate) trait ToCublasResult {
     fn to_cublas_result(self) -> CublasResult<()>;
 }
-impl ToCublasResult for rcublas_sys::cublasStatus_t {
+impl ToCublasResult for cublasStatus_t {
     fn to_cublas_result(self) -> CublasResult<()> {
-        use rcublas_sys::cublasStatus_t::*;
+        use cublasStatus_t::*;
         match self {
             CUBLAS_STATUS_SUCCESS => Ok(()),
             CUBLAS_STATUS_NOT_INITIALIZED => Err(CublasError::NotInitialized),

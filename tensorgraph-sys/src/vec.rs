@@ -259,12 +259,11 @@ impl<T, D: Device> AsMut<Slice<T, D>> for Vec<T, D> {
 #[cfg(test)]
 mod tests {
     use super::Vec;
-    use crate::device::cpu::Cpu;
-    use std::{alloc::Global, ops::Deref};
+    use std::ops::Deref;
 
     #[test]
     fn push() {
-        let mut v = Vec::with_capacity_in(0, Cpu::<Global>::default());
+        let mut v = Vec::<_>::with_capacity(0);
 
         assert_eq!(v.capacity(), 0);
         v.push(0);
@@ -281,7 +280,7 @@ mod tests {
 
     #[test]
     fn convert() {
-        let mut v1 = Vec::with_capacity_in(0, Cpu::<Global>::default());
+        let mut v1 = Vec::with_capacity(0);
 
         v1.push(0);
         v1.push(1);

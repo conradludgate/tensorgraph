@@ -12,9 +12,9 @@
 
 pub mod blas;
 pub mod device;
+pub mod dims;
 pub mod ptr;
+pub mod storage;
 pub mod tensor;
 pub mod vec;
 pub mod zero;
-pub mod storage;
-pub mod dims;

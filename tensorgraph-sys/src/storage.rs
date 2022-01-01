@@ -1,6 +1,10 @@
 use std::alloc::Allocator;
 
-use crate::{device::{Device, cpu::Cpu}, ptr::slice::Slice, vec::Vec};
+use crate::{
+    device::{cpu::Cpu, Device},
+    ptr::slice::Slice,
+    vec::Vec,
+};
 
 pub trait IntoOwned {
     type Owned;
