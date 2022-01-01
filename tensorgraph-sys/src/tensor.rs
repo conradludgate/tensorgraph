@@ -259,10 +259,8 @@ mod tests {
     use std::ops::Deref;
 
     use crate::{
-        device::Device,
         tensor::{gemm, Tensor},
         vec::Vec,
-        Share, blas::cublas::CublasContext,
     };
 
     #[test]
@@ -356,10 +354,12 @@ mod tests {
 
     #[test]
     fn matmul_cuda() {
-        use crate::device::cuda::{quick_init, Cuda};
+        use crate::device::cuda::{Context, CudaOwned};
+        use crate::blas::cublas::CublasContext;
 
-        let cuda = quick_init().unwrap();
-        let cuda = cuda.share();
+        let _ctx = Context::quick_init().unwrap();
+        let cuda = CudaOwned::new().unwrap();
+        let cuda = cuda.deref();
 
         // column major
         let a = Vec::copy_from_host_in(&[0., 2., 4., 1., 3., 5.], cuda);
@@ -374,7 +374,7 @@ mod tests {
         let c = a.dot_in(b, cuda);
 
         let mut out = vec![0.0_f32; 6];
-        Cuda::copy_to_host(c.data.deref(), &mut out);
+        c.data.copy_to_host(&mut out);
 
         assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
     }
@@ -411,10 +411,12 @@ mod tests {
 
     #[test]
     fn matmul_cuda2() {
-        use crate::device::cuda::{quick_init, Cuda};
+        use crate::device::cuda::{Context, CudaOwned};
+        use crate::blas::cublas::CublasContext;
 
-        let cuda = quick_init().unwrap();
-        let cuda = cuda.share();
+        let _ctx = Context::quick_init().unwrap();
+        let cuda = CudaOwned::new().unwrap();
+        let cuda = cuda.deref();
 
         // column major
         let a = Vec::copy_from_host_in(&[0.001, 1.0, 1.0, 0.], cuda);
@@ -434,7 +436,7 @@ mod tests {
         }
 
         let mut out = vec![0.; 4];
-        Cuda::copy_to_host(c.data.deref(), &mut out);
+        c.data.copy_to_host(&mut out);
 
         let expected = [
             1.1278865019586632,

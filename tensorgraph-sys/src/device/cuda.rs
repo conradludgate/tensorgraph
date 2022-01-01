@@ -1,71 +1,59 @@
-use std::ffi::c_void;
+use std::{ffi::c_void, ops::Deref};
 
 use cust::{
     error::{CudaError, CudaResult},
     memory::DevicePointer,
-    CudaFlags,
 };
 
-use crate::{
-    ptr::{non_null::NonNull, slice::Slice},
-    Share,
-};
+use crate::ptr::{non_null::NonNull, slice::Slice};
 
 use super::{Device, DevicePtr};
 
 mod context;
 mod stream;
-pub use context::{Context, SharedContext};
-pub use stream::{SharedStream, Stream};
-
-pub fn quick_init() -> CudaResult<CudaOwned> {
-    cust::init(CudaFlags::empty())?;
-    let ctx = Context::new(cust::device::Device::get_device(0)?)?;
-    let stream = Stream::new()?;
-
-    Ok(CudaOwned { ctx, stream })
-}
+// pub mod global;
+pub use context::{Context, SharedContext, AttachedContext, FloatingContext};
+pub use stream::{SharedStream, Stream, with_stream, get_stream};
 
 pub struct CudaOwned {
     stream: Stream,
-    ctx: Context,
 }
 
-impl Share for CudaOwned {
-    type Ref<'a>
-    where
-        Self: 'a,
-    = Cuda<'a>;
+impl CudaOwned {
+    pub fn new() -> CudaResult<Self> {
+        let stream = Stream::new()?;
 
-    fn share(&self) -> Self::Ref<'_> {
-        Cuda {
-            _ctx: &self.ctx,
-            stream: &self.stream,
-        }
+        Ok(CudaOwned { stream })
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct Cuda<'a> {
-    _ctx: &'a SharedContext,
-    stream: &'a SharedStream,
+impl Deref for CudaOwned {
+    type Target = Cuda;
+
+    fn deref(&self) -> &Cuda {
+        Cuda::with_stream(&self.stream)
+    }
 }
 
-impl<'a> Cuda<'a> {
-    pub fn new(ctx: &'a SharedContext, stream: &'a SharedStream) -> Self {
-        Cuda { _ctx: ctx, stream }
+pub struct Cuda {
+    stream: SharedStream,
+}
+
+impl Cuda {
+    pub fn with_stream(stream: &SharedStream) -> &Self {
+        unsafe { &*(stream as *const SharedStream as *const Self) }
     }
 
     #[cfg(feature = "cublas")]
-    pub fn init_cublas(
-        self,
+    pub fn init_cublas<'a>(
+        &'a self,
         ctx: &'a crate::blas::cublas::CublasContext,
     ) -> &'a crate::blas::cublas::SharedCublasContext {
-        ctx.with_stream(Some(self.stream))
+        ctx.with_stream(Some(&self.stream))
     }
 }
 
-impl<'a> Device for Cuda<'a> {
+impl<'a> Device for &'a Cuda {
     type Ptr<T: ?Sized> = DevicePointer<T>;
     type AllocError = CudaError;
 
@@ -221,14 +209,14 @@ impl<T: ?Sized> DevicePtr<T> for DevicePointer<T> {
         let dev_slice: *mut [u8] =
             std::ptr::from_raw_parts_mut(self.as_raw() as *mut (), std::mem::size_of::<T>());
         let dev_slice = DevicePointer::from_raw(dev_slice);
-        Cuda::copy_from_host(&*host_slice, Slice::from_slice_ptr_mut(dev_slice))
+        <&Cuda>::copy_from_host(&*host_slice, Slice::from_slice_ptr_mut(dev_slice))
     }
 }
 
-fn d_ptr(ptr: NonNull<[u8], Cuda>) -> cust_raw::CUdeviceptr {
+fn d_ptr(ptr: NonNull<[u8], &Cuda>) -> cust_raw::CUdeviceptr {
     d_ptr2(ptr.as_ptr())
 }
-fn d_ptr1(ptr: NonNull<u8, Cuda>) -> cust_raw::CUdeviceptr {
+fn d_ptr1(ptr: NonNull<u8, &Cuda>) -> cust_raw::CUdeviceptr {
     d_ptr3(ptr.as_ptr())
 }
 fn d_ptr2(mut ptr: DevicePointer<[u8]>) -> cust_raw::CUdeviceptr {

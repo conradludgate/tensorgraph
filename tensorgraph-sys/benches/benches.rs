@@ -1,10 +1,11 @@
+use std::ops::Deref;
+
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use tensorgraph_sys::{
     blas::{BLASDevice, GEMM},
-    device::{cpu::Cpu, Device},
+    device::cpu::Cpu,
     tensor::{gemm, Tensor},
     vec::Vec,
-    Share,
 };
 
 /// Performs 1000 matrix mulitplications on a 256x256 matrix
@@ -61,20 +62,20 @@ pub fn matmul(c: &mut Criterion) {
 
     #[cfg(feature = "cublas")]
     {
-        use tensorgraph_sys::device::cuda::{Cuda, quick_init};
         use tensorgraph_sys::blas::cublas::CublasContext;
+        use tensorgraph_sys::device::cuda::{Context, CudaOwned};
 
-        let cuda = quick_init().unwrap();
-        let cuda = cuda.share();
+        let _ctx = Context::quick_init().unwrap();
+        let cuda = CudaOwned::new().unwrap();
+        let cuda = cuda.deref();
         let ctx = CublasContext::new();
         let ctx = cuda.init_cublas(&ctx);
 
         group.bench_function("cublas", |b| {
-
             b.iter(|| {
                 // includes the time to sync data in the benchmark
                 let mut out = vec![0.0f64; 256 * 256];
-                Cuda::copy_to_host(&matmul_1000_256(&init, cuda, ctx), &mut out);
+                matmul_1000_256(&init, cuda, ctx).copy_to_host(&mut out);
 
                 black_box(out)
             });

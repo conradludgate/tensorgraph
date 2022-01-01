@@ -71,6 +71,10 @@ impl<T: Copy, D: Device> Slice<T, D> {
     pub fn copy_from_host(&mut self, from: &[T]) {
         D::copy_from_host(from, self)
     }
+
+    pub fn copy_to_host(&self, to: &mut [T]) {
+        D::copy_to_host(self, to)
+    }
 }
 
 impl<T: Copy, D: Device> Slice<MaybeUninit<T>, D> {

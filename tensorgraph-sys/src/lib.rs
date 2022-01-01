@@ -8,6 +8,8 @@
     ptr_metadata,
     maybe_uninit_slice,
     generic_const_exprs,
+    thread_local,
+    once_cell,
 )]
 
 pub mod blas;
