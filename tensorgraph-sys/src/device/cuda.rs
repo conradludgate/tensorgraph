@@ -27,7 +27,7 @@ impl<'a> Cuda<'a> {
 
     #[cfg(feature = "cublas")]
     pub fn init_cublas(&self) -> crate::blas::cublas::CublasContext {
-        unsafe { crate::blas::cublas::CublasContext::new(self.stream.inner as *mut _) }
+        unsafe { crate::blas::cublas::CublasContext::new(self.stream.inner() as *mut _) }
     }
 }
 
@@ -45,7 +45,7 @@ impl<'a> Device for Cuda<'a> {
         cust_raw::cuMemAllocAsync(
             &mut ptr as *mut *mut c_void as *mut u64,
             size,
-            self.stream.inner,
+            self.stream.inner(),
         )
         .to_cuda_result()?;
         let ptr = std::ptr::from_raw_parts_mut(ptr as *mut (), size);
@@ -58,12 +58,12 @@ impl<'a> Device for Cuda<'a> {
     ) -> CudaResult<NonNull<[u8], Self>> {
         let size = layout.size();
         let ptr = self.allocate(layout)?;
-        cust_raw::cuMemsetD8Async(d_ptr(ptr), 0, size, self.stream.inner).to_cuda_result()?;
+        cust_raw::cuMemsetD8Async(d_ptr(ptr), 0, size, self.stream.inner()).to_cuda_result()?;
         Ok(ptr)
     }
 
     unsafe fn deallocate(&self, ptr: NonNull<u8, Self>, _layout: std::alloc::Layout) {
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner)
+        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner())
             .to_cuda_result()
             .unwrap();
     }
@@ -77,9 +77,9 @@ impl<'a> Device for Cuda<'a> {
         let new = self.allocate(new_layout)?;
 
         let size = old_layout.size();
-        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.stream.inner)
+        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.stream.inner())
             .to_cuda_result()?;
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner).to_cuda_result()?;
+        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner()).to_cuda_result()?;
 
         Ok(new)
     }
@@ -93,9 +93,9 @@ impl<'a> Device for Cuda<'a> {
         let new = self.allocate_zeroed(new_layout)?;
 
         let size = old_layout.size();
-        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.stream.inner)
+        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.stream.inner())
             .to_cuda_result()?;
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner).to_cuda_result()?;
+        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner()).to_cuda_result()?;
 
         Ok(new)
     }
@@ -109,9 +109,9 @@ impl<'a> Device for Cuda<'a> {
         let size = new_layout.size();
         let new = self.allocate(new_layout)?;
 
-        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.stream.inner)
+        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.stream.inner())
             .to_cuda_result()?;
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner).to_cuda_result()?;
+        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner()).to_cuda_result()?;
 
         Ok(new)
     }

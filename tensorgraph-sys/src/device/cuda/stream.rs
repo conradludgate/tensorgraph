@@ -1,21 +1,25 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ptr::NonNull};
 
 use cust::error::CudaResult;
-use cust_raw::CUstream;
+use cust_raw::{CUstream, CUstream_st};
 
 use super::ToCudaResult;
 
 pub struct Stream {
-    inner: CUstream,
+    inner: NonNull<CUstream_st>,
 }
 
 impl Stream {
     pub fn new() -> CudaResult<Self> {
         let mut stream = std::ptr::null_mut();
 
-        unsafe { cust_raw::cuStreamCreateWithPriority(&mut stream, 0, 0).to_cuda_result()? }
+        unsafe {
+            cust_raw::cuStreamCreateWithPriority(&mut stream, 0, 0).to_cuda_result()?;
 
-        Ok(Self { inner: stream })
+            Ok(Self {
+                inner: NonNull::new_unchecked(stream),
+            })
+        }
     }
 
     pub fn share(&self) -> SharedStream {
@@ -28,19 +32,20 @@ impl Stream {
 
 impl Drop for Stream {
     fn drop(&mut self) {
-        if self.inner.is_null() {
-            return;
-        }
-
         unsafe {
-            let inner = std::mem::replace(&mut self.inner, std::ptr::null_mut());
-            cust_raw::cuStreamDestroy_v2(inner);
+            cust_raw::cuStreamDestroy_v2(self.inner.as_mut());
         }
     }
 }
 
 #[derive(Clone, Copy)]
 pub struct SharedStream<'a> {
-    pub(crate) inner: CUstream,
+    pub(crate) inner: NonNull<CUstream_st>,
     _marker: PhantomData<&'a Stream>,
+}
+
+impl<'a> SharedStream<'a> {
+    pub(crate) unsafe fn inner(mut self) -> CUstream {
+        self.inner.as_mut()
+    }
 }
