@@ -262,6 +262,7 @@ mod tests {
         device::Device,
         tensor::{gemm, Tensor},
         vec::Vec,
+        Share, blas::cublas::CublasContext,
     };
 
     #[test]
@@ -355,18 +356,17 @@ mod tests {
 
     #[test]
     fn matmul_cuda() {
-        use crate::device::cuda::{Context, Cuda, Stream};
+        use crate::device::cuda::{quick_init, Cuda};
 
-        let cuda_ctx = Context::quick_init().unwrap();
-        let cuda_stream = Stream::new().unwrap();
-
-        let cuda = Cuda::new(cuda_ctx.share(), cuda_stream.share());
+        let cuda = quick_init().unwrap();
+        let cuda = cuda.share();
 
         // column major
         let a = Vec::copy_from_host_in(&[0., 2., 4., 1., 3., 5.], cuda);
         let b = Vec::copy_from_host_in(&[0., 2., 1., 3.], cuda);
 
-        let ctx = cuda.init_cublas();
+        let ctx = CublasContext::new();
+        let ctx = cuda.init_cublas(&ctx);
 
         let a = Tensor::from_shape_in(ctx, [3, 2], a);
         let b = Tensor::from_shape_in(ctx, [2, 2], b);
@@ -411,19 +411,18 @@ mod tests {
 
     #[test]
     fn matmul_cuda2() {
-        use crate::device::cuda::{Context, Cuda, Stream};
+        use crate::device::cuda::{quick_init, Cuda};
 
-        let cuda_ctx = Context::quick_init().unwrap();
-        let cuda_stream = Stream::new().unwrap();
-
-        let cuda = Cuda::new(cuda_ctx.share(), cuda_stream.share());
+        let cuda = quick_init().unwrap();
+        let cuda = cuda.share();
 
         // column major
         let a = Vec::copy_from_host_in(&[0.001, 1.0, 1.0, 0.], cuda);
         let b = a.clone();
         let c = b.clone();
 
-        let ctx = cuda.init_cublas();
+        let ctx = CublasContext::new();
+        let ctx = cuda.init_cublas(&ctx);
 
         let mut a = Tensor::from_shape_in(ctx, [2, 2], a);
         let b = Tensor::from_shape_in(ctx, [2, 2], b);

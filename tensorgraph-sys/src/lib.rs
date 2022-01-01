@@ -7,7 +7,7 @@
     slice_ptr_len,
     ptr_metadata,
     maybe_uninit_slice,
-    generic_const_exprs
+    generic_const_exprs,
 )]
 
 pub mod blas;
@@ -18,3 +18,22 @@ pub mod storage;
 pub mod tensor;
 pub mod vec;
 pub mod zero;
+
+pub trait Share {
+    type Ref<'a>
+    where
+        Self: 'a;
+
+    fn share(&self) -> Self::Ref<'_>;
+}
+
+impl<D: std::ops::Deref> Share for D {
+    type Ref<'a>
+    where
+        Self: 'a,
+    = &'a D::Target;
+
+    fn share(&self) -> Self::Ref<'_> {
+        self
+    }
+}

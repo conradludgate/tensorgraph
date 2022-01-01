@@ -6,6 +6,8 @@ pub mod cpu;
 #[cfg(feature = "cuda")]
 pub mod cuda;
 
+// pub mod global;
+
 pub trait Device {
     #![allow(clippy::missing_safety_doc)]
 

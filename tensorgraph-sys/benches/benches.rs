@@ -4,6 +4,7 @@ use tensorgraph_sys::{
     device::{cpu::Cpu, Device},
     tensor::{gemm, Tensor},
     vec::Vec,
+    Share,
 };
 
 /// Performs 1000 matrix mulitplications on a 256x256 matrix
@@ -59,23 +60,26 @@ pub fn matmul(c: &mut Criterion) {
     group.bench_function("matrixmultiply", cpu);
 
     #[cfg(feature = "cublas")]
-    group.bench_function("cublas", |b| {
-        use tensorgraph_sys::device::cuda::{Context, Cuda, Stream};
+    {
+        use tensorgraph_sys::device::cuda::{Cuda, quick_init};
+        use tensorgraph_sys::blas::cublas::CublasContext;
 
-        // setup device and cublas contexts
-        let cuda_ctx = Context::quick_init().unwrap();
-        let cuda_stream = Stream::new().unwrap();
-        let cuda = Cuda::new(cuda_ctx.share(), cuda_stream.share());
-        let ctx = cuda.init_cublas();
+        let cuda = quick_init().unwrap();
+        let cuda = cuda.share();
+        let ctx = CublasContext::new();
+        let ctx = cuda.init_cublas(&ctx);
 
-        b.iter(|| {
-            // includes the time to sync data in the benchmark
-            let mut out = vec![0.0f64; 256 * 256];
-            Cuda::copy_to_host(&matmul_1000_256(&init, cuda, ctx), &mut out);
+        group.bench_function("cublas", |b| {
 
-            black_box(out)
+            b.iter(|| {
+                // includes the time to sync data in the benchmark
+                let mut out = vec![0.0f64; 256 * 256];
+                Cuda::copy_to_host(&matmul_1000_256(&init, cuda, ctx), &mut out);
+
+                black_box(out)
+            });
         });
-    });
+    }
 
     group.finish();
 }

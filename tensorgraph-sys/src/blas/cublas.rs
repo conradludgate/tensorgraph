@@ -1,30 +1,80 @@
+use std::{ops::Deref, ptr::NonNull};
+
 use cust::memory::DevicePointer;
 use rcublas_sys::{
-    cublasCreate_v2, cublasDgemm_v2, cublasSetStream_v2, cublasSgemm_v2, cublasStatus_t,
-    cudaStream_t,
+    cublasContext, cublasCreate_v2, cublasDestroy_v2, cublasDgemm_v2, cublasSgemm_v2,
+    cublasStatus_t, cublasSetStream_v2, cublasHandle_t,
 };
 
-use crate::device::cuda::Cuda;
+use crate::device::cuda::{Cuda, SharedStream};
 
 use super::{BLASDevice, GEMM};
 
-#[derive(Clone, Copy)]
-pub struct CublasContext(rcublas_sys::cublasHandle_t);
+pub struct CublasContext {
+    inner: NonNull<cublasContext>,
+}
 
 impl CublasContext {
-    pub(crate) unsafe fn new(stream: cudaStream_t) -> Self {
-        let mut handle = std::ptr::null_mut();
-        cublasCreate_v2(&mut handle).to_cublas_result().unwrap();
+    pub fn new() -> Self {
+        unsafe {
+            let mut handle = std::ptr::null_mut();
+            cublasCreate_v2(&mut handle).to_cublas_result().unwrap();
 
-        cublasSetStream_v2(handle, stream)
+            Self {
+                inner: NonNull::new_unchecked(handle),
+            }
+        }
+    }
+
+    pub fn with_stream<'a>(&'a self, stream: Option<&'a SharedStream>) -> &'a SharedCublasContext {
+        unsafe {
+            let ptr = self.inner.as_ptr();
+
+            cublasSetStream_v2(
+                ptr as *mut _,
+                stream.map_or_else(std::ptr::null_mut, SharedStream::inner) as *mut _,
+            )
             .to_cublas_result()
             .unwrap();
-        Self(handle)
+
+            &*(ptr as *const _)
+        }
+    }
+}
+
+impl Default for CublasContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for CublasContext {
+    fn drop(&mut self) {
+        unsafe {
+            cublasDestroy_v2(self.inner.as_ptr())
+                .to_cublas_result()
+                .unwrap()
+        }
+    }
+}
+
+impl Deref for CublasContext {
+    type Target = SharedCublasContext;
+    fn deref(&self) -> &SharedCublasContext {
+        unsafe { &*(self.inner.as_ptr() as *mut _) }
+    }
+}
+
+pub struct SharedCublasContext(cublasContext);
+
+impl SharedCublasContext {
+    fn handle(&self) -> cublasHandle_t {
+        self as *const _ as *mut _
     }
 }
 
 impl<'a> BLASDevice for Cuda<'a> {
-    type Context = CublasContext;
+    type Context = &'a SharedCublasContext;
 }
 
 impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
@@ -39,7 +89,7 @@ impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
 
 impl<'a> GEMM<Cuda<'a>> for f32 {
     unsafe fn gemm(
-        handle: CublasContext,
+        handle: &'a SharedCublasContext,
         transa: super::MatrixOp,
         transb: super::MatrixOp,
         m: i32,
@@ -55,7 +105,7 @@ impl<'a> GEMM<Cuda<'a>> for f32 {
         ldc: i32,
     ) {
         cublasSgemm_v2(
-            handle.0,
+            handle.handle(),
             transa.into(),
             transb.into(),
             m,
@@ -77,7 +127,7 @@ impl<'a> GEMM<Cuda<'a>> for f32 {
 
 impl<'a> GEMM<Cuda<'a>> for f64 {
     unsafe fn gemm(
-        handle: CublasContext,
+        handle: &'a SharedCublasContext,
         transa: super::MatrixOp,
         transb: super::MatrixOp,
         m: i32,
@@ -93,7 +143,7 @@ impl<'a> GEMM<Cuda<'a>> for f64 {
         ldc: i32,
     ) {
         cublasDgemm_v2(
-            handle.0,
+            handle.handle(),
             transa.into(),
             transb.into(),
             m,

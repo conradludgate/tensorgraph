@@ -3,9 +3,13 @@ use std::ffi::c_void;
 use cust::{
     error::{CudaError, CudaResult},
     memory::DevicePointer,
+    CudaFlags,
 };
 
-use crate::ptr::{non_null::NonNull, slice::Slice};
+use crate::{
+    ptr::{non_null::NonNull, slice::Slice},
+    Share,
+};
 
 use super::{Device, DevicePtr};
 
@@ -14,20 +18,50 @@ mod stream;
 pub use context::{Context, SharedContext};
 pub use stream::{SharedStream, Stream};
 
+pub fn quick_init() -> CudaResult<CudaOwned> {
+    cust::init(CudaFlags::empty())?;
+    let ctx = Context::new(cust::device::Device::get_device(0)?)?;
+    let stream = Stream::new()?;
+
+    Ok(CudaOwned { ctx, stream })
+}
+
+pub struct CudaOwned {
+    stream: Stream,
+    ctx: Context,
+}
+
+impl Share for CudaOwned {
+    type Ref<'a>
+    where
+        Self: 'a,
+    = Cuda<'a>;
+
+    fn share(&self) -> Self::Ref<'_> {
+        Cuda {
+            _ctx: &self.ctx,
+            stream: &self.stream,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct Cuda<'a> {
-    _ctx: SharedContext<'a>,
-    stream: SharedStream<'a>,
+    _ctx: &'a SharedContext,
+    stream: &'a SharedStream,
 }
 
 impl<'a> Cuda<'a> {
-    pub fn new(ctx: SharedContext<'a>, stream: SharedStream<'a>) -> Self {
+    pub fn new(ctx: &'a SharedContext, stream: &'a SharedStream) -> Self {
         Cuda { _ctx: ctx, stream }
     }
 
     #[cfg(feature = "cublas")]
-    pub fn init_cublas(&self) -> crate::blas::cublas::CublasContext {
-        unsafe { crate::blas::cublas::CublasContext::new(self.stream.inner() as *mut _) }
+    pub fn init_cublas(
+        self,
+        ctx: &'a crate::blas::cublas::CublasContext,
+    ) -> &'a crate::blas::cublas::SharedCublasContext {
+        ctx.with_stream(Some(self.stream))
     }
 }
 

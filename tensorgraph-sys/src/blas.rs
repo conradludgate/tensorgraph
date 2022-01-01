@@ -8,7 +8,7 @@ mod blas_sys;
 mod matmul;
 
 #[cfg(feature = "cublas")]
-pub(crate) mod cublas;
+pub mod cublas;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq)]
