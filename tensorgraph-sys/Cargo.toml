@@ -20,7 +20,7 @@ blas-sys = { version = "0.7", optional = true }
 matrixmultiply = { version = "0.3", optional = true }
 
 [features]
-default = ["openblas", "cublas"]
+default = ["accelerate"]
 
 cuda = ["cust", "cust_raw"]
 
