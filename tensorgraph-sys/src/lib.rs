@@ -9,7 +9,8 @@
     maybe_uninit_slice,
     generic_const_exprs,
     thread_local,
-    once_cell
+    once_cell,
+    layout_for_ptr,
 )]
 
 pub mod blas;
@@ -20,6 +21,7 @@ pub mod storage;
 pub mod tensor;
 pub mod vec;
 pub mod zero;
+pub mod boxed;
 
 pub trait Share {
     type Ref<'a>

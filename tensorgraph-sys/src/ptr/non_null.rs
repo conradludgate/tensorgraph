@@ -1,10 +1,16 @@
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
 use crate::device::{Device, DevicePtr};
 
 pub struct NonNull<T: ?Sized, D: Device + ?Sized> {
     inner: std::ptr::NonNull<T>,
     _marker: PhantomData<D>,
+}
+
+impl<T: ?Sized, D: Device + ?Sized> Debug for NonNull<T, D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("NonNull").field(&self.inner).finish()
+    }
 }
 
 impl<T: ?Sized, D: Device + ?Sized> Clone for NonNull<T, D> {

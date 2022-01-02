@@ -1,5 +1,5 @@
 use std::{
-    alloc::{Allocator, Global, Layout},
+    alloc::{Allocator, Global},
     borrow::Borrow,
     marker::PhantomData,
     mem::{ManuallyDrop, MaybeUninit},
@@ -7,14 +7,14 @@ use std::{
 };
 
 use crate::{
-    device::{Device, DeviceAllocator, DevicePtr, DefaultDeviceAllocator},
+    boxed::Box,
+    device::{cpu::Cpu, DefaultDeviceAllocator, Device, DeviceAllocator, DevicePtr},
     ptr::{non_null::NonNull, slice::Slice},
     zero::Zero,
 };
 
 pub struct Vec<T, A: DeviceAllocator = Global> {
-    alloc: A,
-    buf: NonNull<[T], A::Device>,
+    buf: Box<[MaybeUninit<T>], A>,
     len: usize,
 
     // marks that Vec owned the T values
@@ -28,7 +28,7 @@ impl<T, A: DeviceAllocator> Drop for Vec<T, A> {
             if std::mem::needs_drop::<T>() {
                 // we are on the CPU
                 if A::Device::IS_CPU {
-                    let slice = &mut *(self.buf.as_ptr().as_raw());
+                    let slice = &mut *(self.buf.ptr.as_ptr().as_raw());
                     let slice = &mut slice[..self.len];
                     for i in slice {
                         std::ptr::drop_in_place(i);
@@ -37,8 +37,6 @@ impl<T, A: DeviceAllocator> Drop for Vec<T, A> {
                     panic!("drop types should not be initialised outside of the CPU")
                 }
             }
-            let (layout, _) = Layout::new::<T>().repeat(self.capacity()).unwrap();
-            self.alloc.deallocate(self.buf.cast(), layout)
         }
     }
 }
@@ -47,7 +45,7 @@ impl<T: Copy, A: DeviceAllocator + Clone> Clone for Vec<T, A> {
     fn clone(&self) -> Self {
         let slice = self.deref();
         unsafe {
-            let mut vec = Self::with_capacity_in(slice.len(), self.alloc.clone());
+            let mut vec = Self::with_capacity_in(slice.len(), self.buf.allocator().clone());
             vec.space_capacity_mut().init_from_slice(slice);
             vec.set_len(slice.len());
             vec
@@ -64,12 +62,8 @@ impl<T, A: DeviceAllocator> Vec<T, A> {
     where
         T: Zero,
     {
-        unsafe {
-            let (layout, _) = Layout::new::<T>().repeat(len).unwrap();
-            let data = alloc.allocate_zeroed(layout).unwrap().cast();
-            let buf = NonNull::slice_from_raw_parts(data, len);
-            Self::from_raw_parts_in(buf, len, alloc)
-        }
+        let buf = Box::zeroed_in(len, alloc);
+        unsafe { Self::from_raw_parts(buf, len) }
     }
 
     pub fn zeroed(len: usize) -> Self
@@ -102,9 +96,8 @@ impl<T, A: DeviceAllocator> Vec<T, A> {
 
     /// # Safety
     /// `buf` must be a valid allocation in `device`, and `len` items must be initialised
-    pub unsafe fn from_raw_parts_in(buf: NonNull<[T], A::Device>, len: usize, alloc: A) -> Self {
+    pub unsafe fn from_raw_parts(buf: Box<[MaybeUninit<T>], A>, len: usize) -> Self {
         Self {
-            alloc,
             buf,
             len,
             _marker: PhantomData,
@@ -119,12 +112,8 @@ impl<T, A: DeviceAllocator> Vec<T, A> {
     }
 
     pub fn with_capacity_in(capacity: usize, alloc: A) -> Self {
-        unsafe {
-            let (layout, _) = Layout::new::<T>().repeat(capacity).unwrap();
-            let data = alloc.allocate(layout).unwrap().cast();
-            let buf = NonNull::slice_from_raw_parts(data, capacity);
-            Self::from_raw_parts_in(buf, 0, alloc)
-        }
+        let buf = Box::with_capacity_in(capacity, alloc);
+        unsafe { Self::from_raw_parts(buf, 0) }
     }
 
     pub fn len(&self) -> usize {
@@ -136,19 +125,11 @@ impl<T, A: DeviceAllocator> Vec<T, A> {
     }
 
     pub fn capacity(&self) -> usize {
-        let buf: *mut [T] = self.buf.as_ptr().as_raw();
-        buf.len()
+        self.buf.len()
     }
 
     pub fn space_capacity_mut(&mut self) -> &mut Slice<MaybeUninit<T>, A::Device> {
-        unsafe {
-            let ptr: *mut [T] = self.buf.as_ptr().as_raw();
-            let (ptr, cap) = ptr.to_raw_parts();
-            let ptr = ptr as *mut T;
-            let ptr = ptr.add(self.len);
-            let ptr = std::ptr::from_raw_parts_mut(ptr as *mut _, cap - self.len);
-            &mut *(ptr as *mut _)
-        }
+        &mut self.buf.deref_mut()[self.len..]
     }
 
     /// # Safety
@@ -166,23 +147,14 @@ impl<T, A: DeviceAllocator> Vec<T, A> {
                 n => n.next_power_of_two(),
             };
 
-            let layout = Layout::new::<T>();
-            let old_layout = layout.repeat(old).unwrap().0;
-            let new_layout = layout.repeat(new).unwrap().0;
-
-            let data = self
-                .alloc
-                .grow(self.buf.cast(), old_layout, new_layout)
-                .unwrap()
-                .cast();
-            self.buf = NonNull::slice_from_raw_parts(data, new);
+            self.buf.resize(new);
         }
     }
 
     pub fn push(&mut self, val: T) {
         unsafe {
             self.ensure(self.len + 1);
-            self.buf.cast::<T>().as_ptr().add(self.len).write(val);
+            self.buf.ptr.cast::<T>().as_ptr().add(self.len).write(val);
             self.len += 1;
         }
     }
@@ -193,8 +165,9 @@ impl<T, A: Allocator> From<std::vec::Vec<T, A>> for Vec<T, A> {
         unsafe {
             let (ptr, len, cap, alloc) = v.into_raw_parts_with_alloc();
             let data = NonNull::new_unchecked(ptr);
-            let buf = NonNull::slice_from_raw_parts(data, cap);
-            Self::from_raw_parts_in(buf, len, alloc)
+            let ptr = NonNull::slice_from_raw_parts(data.cast(), cap);
+            let buf = Box::from_raw_parts(ptr, alloc);
+            Self::from_raw_parts(buf, len)
         }
     }
 }
@@ -203,10 +176,10 @@ impl<T, A: Allocator> From<Vec<T, A>> for std::vec::Vec<T, A> {
     fn from(v: Vec<T, A>) -> Self {
         unsafe {
             let v = ManuallyDrop::new(v);
-            let alloc = std::ptr::read(&v.alloc);
-            let (ptr, cap) = v.buf.as_ptr().to_raw_parts();
-            let ptr = ptr.cast();
-            Self::from_raw_parts_in(ptr, v.len, cap, alloc)
+            let buf = std::ptr::read(&v.buf);
+            let (ptr, alloc) = buf.into_raw_parts();
+            let (ptr, cap) = ptr.as_ptr().to_raw_parts();
+            std::vec::Vec::from_raw_parts_in(ptr as *mut _, v.len, cap, alloc)
         }
     }
 }
@@ -221,41 +194,43 @@ impl<T, A: DeviceAllocator> Deref for Vec<T, A> {
     type Target = Slice<T, A::Device>;
 
     fn deref(&self) -> &Self::Target {
-        unsafe {
-            let ptr: *mut [T] = self.buf.as_ptr().as_raw();
-            let (ptr, _) = ptr.to_raw_parts();
-            let ptr = std::ptr::from_raw_parts(ptr, self.len);
-            &*(ptr as *const _)
-        }
+        unsafe { self.buf.deref()[..self.len()].assume_init() }
     }
 }
 
 impl<T, A: DeviceAllocator> DerefMut for Vec<T, A> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe {
-            let ptr: *mut [T] = self.buf.as_ptr().as_raw();
-            let (ptr, _) = ptr.to_raw_parts();
-            let ptr = std::ptr::from_raw_parts_mut(ptr, self.len);
-            &mut *(ptr as *mut _)
-        }
+        unsafe { self.buf.deref_mut()[..self.len].assume_init_mut() }
     }
 }
 
 impl<T, A: DeviceAllocator> Borrow<Slice<T, A::Device>> for Vec<T, A> {
     fn borrow(&self) -> &Slice<T, A::Device> {
-        self.deref()
+        self
     }
 }
 
 impl<T, A: DeviceAllocator> AsRef<Slice<T, A::Device>> for Vec<T, A> {
     fn as_ref(&self) -> &Slice<T, A::Device> {
-        self.deref()
+        self
+    }
+}
+
+impl<T, A: DeviceAllocator<Device = Cpu>> AsRef<[T]> for Vec<T, A> {
+    fn as_ref(&self) -> &[T] {
+        self
     }
 }
 
 impl<T, A: DeviceAllocator> AsMut<Slice<T, A::Device>> for Vec<T, A> {
     fn as_mut(&mut self) -> &mut Slice<T, A::Device> {
-        self.deref_mut()
+        self
+    }
+}
+
+impl<T, A: DeviceAllocator<Device = Cpu>> AsMut<[T]> for Vec<T, A> {
+    fn as_mut(&mut self) -> &mut [T] {
+        self
     }
 }
 
@@ -294,6 +269,6 @@ mod tests {
         let v2 = vec![0, 1, 2, 3, 4];
 
         assert_eq!(v1.deref().deref(), v2.as_slice());
-        assert_eq!(std::vec::Vec::from(v1), v2);
+        assert_eq!(v1.into_std(), v2);
     }
 }
