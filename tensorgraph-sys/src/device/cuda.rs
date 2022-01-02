@@ -5,7 +5,7 @@ use cust::{
     memory::DevicePointer,
 };
 
-use crate::ptr::{non_null::NonNull, slice::Slice};
+use crate::ptr::{non_null::NonNull, reef::Ref};
 
 use super::{Device, DeviceAllocator, DevicePtr};
 
@@ -22,7 +22,7 @@ pub struct Cuda;
 impl Device for Cuda {
     type Ptr<T: ?Sized> = DevicePointer<T>;
 
-    fn copy_from_host<T: Copy>(from: &[T], to: &mut crate::ptr::slice::Slice<T, Self>) {
+    fn copy_from_host<T: Copy>(from: &[T], to: &mut Ref<[T], Self>) {
         assert_eq!(from.len(), to.len());
         // Safety:
         // These slices had to be made using unsafe functions. Those should ensure that these pointers are valid.
@@ -37,7 +37,7 @@ impl Device for Cuda {
         }
     }
 
-    fn copy_to_host<T: Copy>(from: &crate::ptr::slice::Slice<T, Self>, to: &mut [T]) {
+    fn copy_to_host<T: Copy>(from: &Ref<[T], Self>, to: &mut [T]) {
         assert_eq!(from.len(), to.len());
         // Safety:
         // These slices had to be made using unsafe functions. Those should ensure that these pointers are valid.
@@ -52,10 +52,7 @@ impl Device for Cuda {
         }
     }
 
-    fn copy<T: Copy>(
-        from: &crate::ptr::slice::Slice<T, Self>,
-        to: &mut crate::ptr::slice::Slice<T, Self>,
-    ) {
+    fn copy<T: Copy>(from: &Ref<[T], Self>, to: &mut Ref<[T], Self>) {
         assert_eq!(from.len(), to.len());
         // Safety:
         // These slices had to be made using unsafe functions. Those should ensure that these pointers are valid.
@@ -175,7 +172,7 @@ impl<T: ?Sized> DevicePtr<T> for DevicePointer<T> {
         let dev_slice: *mut [u8] =
             std::ptr::from_raw_parts_mut(self.as_raw() as *mut (), std::mem::size_of::<T>());
         let dev_slice = DevicePointer::from_raw(dev_slice);
-        Cuda::copy_from_host(&*host_slice, Slice::from_slice_ptr_mut(dev_slice))
+        Cuda::copy_from_host(&*host_slice, Ref::from_ptr_mut(dev_slice))
     }
 }
 

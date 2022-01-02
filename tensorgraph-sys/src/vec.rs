@@ -9,7 +9,7 @@ use std::{
 use crate::{
     boxed::Box,
     device::{cpu::Cpu, DefaultDeviceAllocator, Device, DeviceAllocator, DevicePtr},
-    ptr::{non_null::NonNull, slice::Slice},
+    ptr::{non_null::NonNull, reef::Ref},
     zero::Zero,
 };
 
@@ -58,12 +58,16 @@ pub fn vec_from_host<T: Copy, D: DefaultDeviceAllocator>(slice: &[T]) -> Vec<T, 
 }
 
 impl<T, A: DeviceAllocator> Vec<T, A> {
+    pub fn from_box(b: Box<[T], A>) -> Self {
+        let len = b.len();
+        unsafe { Self::from_raw_parts(b.into_uninit(), len) }
+    }
+
     pub fn zeroed_in(len: usize, alloc: A) -> Self
     where
         T: Zero,
     {
-        let buf = Box::zeroed_in(len, alloc);
-        unsafe { Self::from_raw_parts(buf, len) }
+        Self::from_box(Box::zeroed(len, alloc))
     }
 
     pub fn zeroed(len: usize) -> Self
@@ -104,6 +108,11 @@ impl<T, A: DeviceAllocator> Vec<T, A> {
         }
     }
 
+    pub fn into_raw_parts(self) -> (Box<[MaybeUninit<T>], A>, usize) {
+        let v = ManuallyDrop::new(self);
+        unsafe { (std::ptr::read(&v.buf), v.len) }
+    }
+
     pub fn with_capacity(capacity: usize) -> Self
     where
         A: Default,
@@ -112,7 +121,7 @@ impl<T, A: DeviceAllocator> Vec<T, A> {
     }
 
     pub fn with_capacity_in(capacity: usize, alloc: A) -> Self {
-        let buf = Box::with_capacity_in(capacity, alloc);
+        let buf = Box::with_capacity(capacity, alloc);
         unsafe { Self::from_raw_parts(buf, 0) }
     }
 
@@ -128,7 +137,7 @@ impl<T, A: DeviceAllocator> Vec<T, A> {
         self.buf.len()
     }
 
-    pub fn space_capacity_mut(&mut self) -> &mut Slice<MaybeUninit<T>, A::Device> {
+    pub fn space_capacity_mut(&mut self) -> &mut Ref<[MaybeUninit<T>], A::Device> {
         &mut self.buf.deref_mut()[self.len..]
     }
 
@@ -164,8 +173,8 @@ impl<T, A: Allocator> From<std::vec::Vec<T, A>> for Vec<T, A> {
     fn from(v: std::vec::Vec<T, A>) -> Self {
         unsafe {
             let (ptr, len, cap, alloc) = v.into_raw_parts_with_alloc();
-            let data = NonNull::new_unchecked(ptr);
-            let ptr = NonNull::slice_from_raw_parts(data.cast(), cap);
+            let data = NonNull::new_unchecked(ptr as *mut MaybeUninit<T>);
+            let ptr = NonNull::slice_from_raw_parts(data, cap);
             let buf = Box::from_raw_parts(ptr, alloc);
             Self::from_raw_parts(buf, len)
         }
@@ -175,11 +184,10 @@ impl<T, A: Allocator> From<std::vec::Vec<T, A>> for Vec<T, A> {
 impl<T, A: Allocator> From<Vec<T, A>> for std::vec::Vec<T, A> {
     fn from(v: Vec<T, A>) -> Self {
         unsafe {
-            let v = ManuallyDrop::new(v);
-            let buf = std::ptr::read(&v.buf);
+            let (buf, len) = v.into_raw_parts();
             let (ptr, alloc) = buf.into_raw_parts();
             let (ptr, cap) = ptr.as_ptr().to_raw_parts();
-            std::vec::Vec::from_raw_parts_in(ptr as *mut _, v.len, cap, alloc)
+            std::vec::Vec::from_raw_parts_in(ptr as *mut _, len, cap, alloc)
         }
     }
 }
@@ -191,7 +199,7 @@ impl<T, A: Allocator> Vec<T, A> {
 }
 
 impl<T, A: DeviceAllocator> Deref for Vec<T, A> {
-    type Target = Slice<T, A::Device>;
+    type Target = Ref<[T], A::Device>;
 
     fn deref(&self) -> &Self::Target {
         unsafe { self.buf.deref()[..self.len()].assume_init() }
@@ -204,14 +212,14 @@ impl<T, A: DeviceAllocator> DerefMut for Vec<T, A> {
     }
 }
 
-impl<T, A: DeviceAllocator> Borrow<Slice<T, A::Device>> for Vec<T, A> {
-    fn borrow(&self) -> &Slice<T, A::Device> {
+impl<T, A: DeviceAllocator> Borrow<Ref<[T], A::Device>> for Vec<T, A> {
+    fn borrow(&self) -> &Ref<[T], A::Device> {
         self
     }
 }
 
-impl<T, A: DeviceAllocator> AsRef<Slice<T, A::Device>> for Vec<T, A> {
-    fn as_ref(&self) -> &Slice<T, A::Device> {
+impl<T, A: DeviceAllocator> AsRef<Ref<[T], A::Device>> for Vec<T, A> {
+    fn as_ref(&self) -> &Ref<[T], A::Device> {
         self
     }
 }
@@ -222,8 +230,8 @@ impl<T, A: DeviceAllocator<Device = Cpu>> AsRef<[T]> for Vec<T, A> {
     }
 }
 
-impl<T, A: DeviceAllocator> AsMut<Slice<T, A::Device>> for Vec<T, A> {
-    fn as_mut(&mut self) -> &mut Slice<T, A::Device> {
+impl<T, A: DeviceAllocator> AsMut<Ref<[T], A::Device>> for Vec<T, A> {
+    fn as_mut(&mut self) -> &mut Ref<[T], A::Device> {
         self
     }
 }

@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, marker::PhantomData, ptr::Pointee};
 
 use crate::device::{Device, DevicePtr};
 
@@ -51,6 +51,13 @@ impl<T: ?Sized, D: Device + ?Sized> NonNull<T, D> {
             inner: inner.cast(),
             _marker,
         }
+    }
+
+    pub fn to_raw_parts(self) -> (NonNull<(), D>, <T as Pointee>::Metadata) {
+        let (ptr, meta) = self.inner.as_ptr().to_raw_parts();
+        let ptr = D::Ptr::from_raw(ptr);
+        let data = unsafe { NonNull::new_unchecked(ptr) };
+        (data, meta)
     }
 }
 

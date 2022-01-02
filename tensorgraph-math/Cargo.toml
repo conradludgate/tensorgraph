@@ -22,7 +22,7 @@ name = "benches"
 harness = false
 
 [features]
-default = ["openblas", "cublas"]
+default = []
 
 cublas = ["tensorgraph-sys/cublas"]
 accelerate = ["tensorgraph-sys/accelerate"]

@@ -2,7 +2,7 @@ use std::alloc::Allocator;
 
 use tensorgraph_sys::{
     device::{cpu::Cpu, DefaultDeviceAllocator, Device, DeviceAllocator},
-    ptr::slice::Slice,
+    ptr::reef::Ref,
     vec::Vec,
 };
 
@@ -11,12 +11,12 @@ pub trait IntoOwned {
     fn into_owned(self) -> Self::Owned;
 }
 
-pub trait Storage: AsRef<Slice<Self::T, Self::Device>> {
+pub trait Storage: AsRef<Ref<[Self::T], Self::Device>> {
     type T;
     type Device: Device;
 }
 
-pub trait StorageMut: Storage + AsMut<Slice<Self::T, Self::Device>> {}
+pub trait StorageMut: Storage + AsMut<Ref<[Self::T], Self::Device>> {}
 
 // Vec
 
@@ -36,12 +36,12 @@ impl<T, A: DeviceAllocator> IntoOwned for Vec<T, A> {
 
 // Shared Slice
 
-impl<'a, T, D: Device> Storage for &'a Slice<T, D> {
+impl<'a, T, D: Device> Storage for &'a Ref<[T], D> {
     type T = T;
     type Device = D;
 }
 
-impl<'a, T: Copy, D: DefaultDeviceAllocator> IntoOwned for &'a Slice<T, D> {
+impl<'a, T: Copy, D: DefaultDeviceAllocator> IntoOwned for &'a Ref<[T], D> {
     type Owned = Vec<T, D::Alloc>;
     fn into_owned(self) -> Self::Owned {
         self.to_owned()
@@ -50,14 +50,14 @@ impl<'a, T: Copy, D: DefaultDeviceAllocator> IntoOwned for &'a Slice<T, D> {
 
 // Mut Slice
 
-impl<'a, T, D: Device> Storage for &'a mut Slice<T, D> {
+impl<'a, T, D: Device> Storage for &'a mut Ref<[T], D> {
     type T = T;
     type Device = D;
 }
 
-impl<'a, T, D: Device> StorageMut for &'a mut Slice<T, D> {}
+impl<'a, T, D: Device> StorageMut for &'a mut Ref<[T], D> {}
 
-impl<'a, T: Copy, D: DefaultDeviceAllocator> IntoOwned for &'a mut Slice<T, D> {
+impl<'a, T: Copy, D: DefaultDeviceAllocator> IntoOwned for &'a mut Ref<[T], D> {
     type Owned = Vec<T, D::Alloc>;
     fn into_owned(self) -> Self::Owned {
         self.to_owned()

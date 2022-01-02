@@ -7,7 +7,8 @@ use std::{
 
 use crate::{
     device::{DeviceAllocator, DevicePtr},
-    ptr::{non_null::NonNull, slice::Slice},
+    ptr::{non_null::NonNull, reef::Ref},
+    zero::Zero,
 };
 
 pub struct Box<T: ?Sized, A: DeviceAllocator = Global> {
@@ -18,10 +19,9 @@ pub struct Box<T: ?Sized, A: DeviceAllocator = Global> {
 }
 
 impl<T: ?Sized, A: DeviceAllocator> Box<T, A> {
-    pub unsafe fn into_raw_parts(self) -> (NonNull<T, A::Device>, A) {
+    pub fn into_raw_parts(self) -> (NonNull<T, A::Device>, A) {
         let b = std::mem::ManuallyDrop::new(self);
-        let alloc = std::ptr::read(&b.alloc);
-        (b.ptr, alloc)
+        (b.ptr, unsafe { std::ptr::read(&b.alloc) })
     }
 
     pub unsafe fn from_raw_parts(ptr: NonNull<T, A::Device>, alloc: A) -> Self {
@@ -45,26 +45,17 @@ impl<T: ?Sized, A: Allocator> Box<T, A> {
     }
 }
 
-impl<T, A: DeviceAllocator> Box<[T], A> {
-    pub fn len(&self) -> usize {
-        std::ptr::metadata(self.ptr.as_ptr().as_raw())
-    }
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-impl<T, A: DeviceAllocator> Deref for Box<[T], A> {
-    type Target = Slice<T, A::Device>;
+impl<T: ?Sized, A: DeviceAllocator> Deref for Box<T, A> {
+    type Target = Ref<T, A::Device>;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { Slice::from_slice_ptr(self.ptr.as_ptr()) }
+        unsafe { Ref::from_ptr(self.ptr.as_ptr()) }
     }
 }
 
 impl<T, A: DeviceAllocator> DerefMut for Box<[T], A> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { Slice::from_slice_ptr_mut(self.ptr.as_ptr()) }
+        unsafe { Ref::from_ptr_mut(self.ptr.as_ptr()) }
     }
 }
 
@@ -96,7 +87,7 @@ impl<T, A: DeviceAllocator> Box<[MaybeUninit<T>], A> {
         self.ptr = NonNull::slice_from_raw_parts(data, new);
     }
 
-    pub fn with_capacity_in(capacity: usize, alloc: A) -> Self {
+    pub fn with_capacity(capacity: usize, alloc: A) -> Self {
         unsafe {
             let (layout, _) = Layout::new::<T>().repeat(capacity).unwrap();
             let data = alloc.allocate(layout).unwrap().cast();
@@ -104,12 +95,35 @@ impl<T, A: DeviceAllocator> Box<[MaybeUninit<T>], A> {
             Self::from_raw_parts(buf, alloc)
         }
     }
-    pub fn zeroed_in(capacity: usize, alloc: A) -> Self {
+    pub fn zeroed_uninit(capacity: usize, alloc: A) -> Self {
         unsafe {
             let (layout, _) = Layout::new::<T>().repeat(capacity).unwrap();
             let data = alloc.allocate_zeroed(layout).unwrap().cast();
             let buf = NonNull::slice_from_raw_parts(data, capacity);
             Self::from_raw_parts(buf, alloc)
+        }
+    }
+}
+
+impl<T, A: DeviceAllocator> Box<[T], A> {
+    pub fn zeroed(capacity: usize, alloc: A) -> Self
+    where
+        T: Zero,
+    {
+        unsafe {
+            let (layout, _) = Layout::new::<T>().repeat(capacity).unwrap();
+            let data = alloc.allocate_zeroed(layout).unwrap().cast();
+            let buf = NonNull::slice_from_raw_parts(data, capacity);
+            Self::from_raw_parts(buf, alloc)
+        }
+    }
+
+    pub fn into_uninit(self) -> Box<[MaybeUninit<T>], A> {
+        unsafe {
+            let (ptr, alloc) = self.into_raw_parts();
+            let (ptr, len) = ptr.to_raw_parts();
+            let ptr = NonNull::slice_from_raw_parts(ptr.cast(), len);
+            Box::from_raw_parts(ptr, alloc)
         }
     }
 }

@@ -5,7 +5,7 @@ use num_traits::{One, Zero};
 use tensorgraph_sys::{
     blas::{BLASContext, DefaultBLASContext, MatrixOp, GEMM},
     device::{DefaultDeviceAllocator, DeviceAllocator},
-    ptr::slice::Slice,
+    ptr::reef::Ref,
     vec::Vec,
 };
 
@@ -56,7 +56,7 @@ impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Tensor<S, C
         self.strides.as_mut().swap(i, j);
     }
 
-    pub fn view(&self) -> Tensor<&Slice<S::T, S::Device>, C, Dim> {
+    pub fn view(&self) -> TensorView<S::T, S::Device, C, Dim> {
         Tensor {
             shape: self.shape.clone(),
             strides: self.strides.clone(),
@@ -65,7 +65,7 @@ impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Tensor<S, C
         }
     }
 
-    pub fn view_mut(&mut self) -> Tensor<&mut Slice<S::T, S::Device>, C, Dim>
+    pub fn view_mut(&mut self) -> TensorViewMut<S::T, S::Device, C, Dim>
     where
         S: StorageMut,
     {
@@ -117,7 +117,9 @@ impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Tensor<S, C
 }
 
 type DefaultVec<T, D> = Vec<T, <D as DefaultDeviceAllocator>::Alloc>;
-type TensorView<'a, T, D, C, Dim> = Tensor<&'a Slice<T, D>, C, Dim>;
+type TensorView<'a, T, D, C, Dim> = Tensor<&'a Ref<[T], D>, C, Dim>;
+type TensorViewMut<'a, T, D, C, Dim> = Tensor<&'a mut Ref<[T], D>, C, Dim>;
+type UninitTensor<'a, T, D, C, Dim> = TensorViewMut<'a, MaybeUninit<T>, D, C, Dim>;
 
 impl<S: Storage, C: BLASContext<Device = S::Device>> Tensor<S, C, [usize; 2]> {
     pub fn dot(
@@ -159,12 +161,10 @@ impl<S: Storage, C: BLASContext<Device = S::Device>> Tensor<S, C, [usize; 2]> {
     }
 }
 
-impl<'a, T: Copy, C: BLASContext, Dim: Dimension>
-    Tensor<&'a mut Slice<MaybeUninit<T>, C::Device>, C, Dim>
-{
+impl<'a, T: Copy, C: BLASContext, Dim: Dimension> UninitTensor<'a, T, C::Device, C, Dim> {
     /// # Safety
     /// Contents must be initialised
-    pub unsafe fn assume_init(self) -> Tensor<&'a mut Slice<T, C::Device>, C, Dim> {
+    pub unsafe fn assume_init(self) -> TensorViewMut<'a, T, C::Device, C, Dim> {
         Tensor {
             shape: self.shape,
             strides: self.strides,
@@ -175,11 +175,11 @@ impl<'a, T: Copy, C: BLASContext, Dim: Dimension>
 }
 
 impl<'a, T: Copy, C: BLASContext, Dim: Dimension>
-    Tensor<&'a Slice<MaybeUninit<T>, C::Device>, C, Dim>
+    TensorView<'a, MaybeUninit<T>, C::Device, C, Dim>
 {
     /// # Safety
     /// Contents must be initialised
-    pub unsafe fn assume_init(self) -> Tensor<&'a Slice<T, C::Device>, C, Dim> {
+    pub unsafe fn assume_init(self) -> TensorView<'a, T, C::Device, C, Dim> {
         Tensor {
             shape: self.shape,
             strides: self.strides,
@@ -193,7 +193,7 @@ pub fn gemm_uninit<F: GEMM<C> + Zero, C: BLASContext>(
     alpha: F,
     a: Tensor<impl Storage<T = F, Device = C::Device>, C, [usize; 2]>,
     b: Tensor<impl Storage<T = F, Device = C::Device>, C, [usize; 2]>,
-    c: Tensor<&mut Slice<MaybeUninit<F>, C::Device>, C, [usize; 2]>,
+    c: UninitTensor<F, C::Device, C, [usize; 2]>,
 ) {
     // Safety:
     // Specifying beta == 0.0 should allow c to be safely read while uninitialised
@@ -205,7 +205,7 @@ pub fn gemm<F: GEMM<C> + Zero, C: BLASContext>(
     a: Tensor<impl Storage<T = F, Device = C::Device>, C, [usize; 2]>,
     b: Tensor<impl Storage<T = F, Device = C::Device>, C, [usize; 2]>,
     beta: F,
-    c: Tensor<&mut Slice<F, C::Device>, C, [usize; 2]>,
+    c: TensorViewMut<F, C::Device, C, [usize; 2]>,
 ) {
     let [rowsa, colsa] = a.shape;
     let [rowsb, colsb] = b.shape;

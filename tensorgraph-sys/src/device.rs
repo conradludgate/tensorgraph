@@ -1,6 +1,6 @@
 use std::alloc::Layout;
 
-use crate::ptr::{non_null::NonNull, slice::Slice};
+use crate::ptr::{non_null::NonNull, reef::Ref};
 
 pub mod cpu;
 #[cfg(feature = "cuda")]
@@ -14,9 +14,9 @@ pub trait Device {
     type Ptr<T: ?Sized>: DevicePtr<T>;
     const IS_CPU: bool = false;
 
-    fn copy_from_host<T: Copy>(from: &[T], to: &mut Slice<T, Self>);
-    fn copy_to_host<T: Copy>(from: &Slice<T, Self>, to: &mut [T]);
-    fn copy<T: Copy>(from: &Slice<T, Self>, to: &mut Slice<T, Self>);
+    fn copy_from_host<T: Copy>(from: &[T], to: &mut Ref<[T], Self>);
+    fn copy_to_host<T: Copy>(from: &Ref<[T], Self>, to: &mut [T]);
+    fn copy<T: Copy>(from: &Ref<[T], Self>, to: &mut Ref<[T], Self>);
 }
 
 pub trait DefaultDeviceAllocator: Device {

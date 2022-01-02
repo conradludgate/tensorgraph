@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::ptr::slice::Slice;
+use crate::ptr::reef::Ref;
 
 use super::{DefaultDeviceAllocator, Device, DeviceAllocator, DevicePtr, NonNull};
 
@@ -20,15 +20,15 @@ impl Device for Cpu {
     type Ptr<T: ?Sized> = *mut T;
     const IS_CPU: bool = true;
 
-    fn copy_from_host<T: Copy>(from: &[T], to: &mut Slice<T, Self>) {
+    fn copy_from_host<T: Copy>(from: &[T], to: &mut Ref<[T], Self>) {
         to.deref_mut().copy_from_slice(from)
     }
 
-    fn copy_to_host<T: Copy>(from: &Slice<T, Self>, to: &mut [T]) {
+    fn copy_to_host<T: Copy>(from: &Ref<[T], Self>, to: &mut [T]) {
         to.copy_from_slice(from.deref())
     }
 
-    fn copy<T: Copy>(from: &Slice<T, Self>, to: &mut Slice<T, Self>) {
+    fn copy<T: Copy>(from: &Ref<[T], Self>, to: &mut Ref<[T], Self>) {
         to.deref_mut().copy_from_slice(from.deref())
     }
 }
