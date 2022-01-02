@@ -3,29 +3,32 @@ use std::mem::MaybeUninit;
 use num_traits::{One, Zero};
 
 use crate::{
-    blas::{BLASDevice, MatrixOp, GEMM},
+    blas::{BLASContext, DefaultBLASContext, MatrixOp, GEMM},
+    device::{DefaultDeviceAllocator, DeviceAllocator},
     dims::{Dimension, RemoveDim},
     ptr::slice::Slice,
     storage::{IntoOwned, Storage, StorageMut},
     vec::Vec,
 };
 
-pub struct Tensor<S: Storage, Dim: Dimension>
-where
-    S::Device: BLASDevice,
-{
+pub struct Tensor<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> {
     shape: Dim,
     strides: Dim,
     data: S,
-
-    ctx: <S::Device as BLASDevice>::Context,
+    ctx: C,
 }
 
-impl<S: Storage, Dim: Dimension> Tensor<S, Dim>
+impl<S: Storage, Dim: Dimension> Tensor<S, <S::Device as DefaultBLASContext>::Context, Dim>
 where
-    S::Device: BLASDevice,
+    S::Device: DefaultBLASContext,
 {
-    pub fn from_shape_in(ctx: <S::Device as BLASDevice>::Context, shape: Dim, data: S) -> Self {
+    pub fn from_shape(shape: Dim, data: S) -> Self {
+        Self::from_shape_in(S::Device::default_ctx(), shape, data)
+    }
+}
+
+impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Tensor<S, C, Dim> {
+    pub fn from_shape_in(ctx: C, shape: Dim, data: S) -> Self {
         assert_eq!(data.as_ref().len(), shape.len());
         let strides = shape.column_major_strides();
         Self {
@@ -34,13 +37,6 @@ where
             data,
             ctx,
         }
-    }
-
-    pub fn from_shape(shape: Dim, data: S) -> Self
-    where
-        <S::Device as BLASDevice>::Context: Default,
-    {
-        Self::from_shape_in(Default::default(), shape, data)
     }
 
     pub fn into_inner(self) -> S {
@@ -57,7 +53,7 @@ where
         self.strides.as_mut().swap(i, j);
     }
 
-    pub fn view(&self) -> Tensor<&Slice<S::T, S::Device>, Dim> {
+    pub fn view(&self) -> Tensor<&Slice<S::T, S::Device>, C, Dim> {
         Tensor {
             shape: self.shape.clone(),
             strides: self.strides.clone(),
@@ -66,7 +62,7 @@ where
         }
     }
 
-    pub fn view_mut(&mut self) -> Tensor<&mut Slice<S::T, S::Device>, Dim>
+    pub fn view_mut(&mut self) -> Tensor<&mut Slice<S::T, S::Device>, C, Dim>
     where
         S: StorageMut,
     {
@@ -78,13 +74,13 @@ where
         }
     }
 
-    pub fn t(&self) -> Tensor<&Slice<S::T, S::Device>, Dim> {
+    pub fn t(&self) -> TensorView<S::T, S::Device, C, Dim> {
         let mut view = self.view();
         view.reverse_axes();
         view
     }
 
-    pub fn into_owned(self) -> Tensor<S::Owned, Dim>
+    pub fn into_owned(self) -> Tensor<S::Owned, C, Dim>
     where
         S: IntoOwned,
         S::Owned: Storage<T = S::T, Device = S::Device>,
@@ -97,7 +93,7 @@ where
         }
     }
 
-    pub fn slice_axis(&self, axis: usize, n: usize) -> Tensor<&Slice<S::T, S::Device>, Dim::Smaller>
+    pub fn slice_axis(&self, axis: usize, n: usize) -> TensorView<S::T, S::Device, C, Dim::Smaller>
     where
         Dim: RemoveDim,
     {
@@ -117,34 +113,34 @@ where
     }
 }
 
-impl<S: Storage> Tensor<S, [usize; 2]>
-where
-    S::Device: BLASDevice,
-{
+type DefaultVec<T, D> = Vec<T, <D as DefaultDeviceAllocator>::Alloc>;
+type TensorView<'a, T, D, C, Dim> = Tensor<&'a Slice<T, D>, C, Dim>;
+
+impl<S: Storage, C: BLASContext<Device = S::Device>> Tensor<S, C, [usize; 2]> {
     pub fn dot(
         &self,
-        rhs: Tensor<impl Storage<T = S::T, Device = S::Device>, [usize; 2]>,
-    ) -> Tensor<Vec<S::T, S::Device>, [usize; 2]>
+        rhs: Tensor<impl Storage<T = S::T, Device = S::Device>, C, [usize; 2]>,
+    ) -> Tensor<DefaultVec<S::T, S::Device>, C, [usize; 2]>
     where
         S::T: Zero + One,
-        S::Device: Default,
-        S::T: GEMM<S::Device>,
+        S::Device: DefaultDeviceAllocator,
+        S::T: GEMM<C>,
     {
-        self.dot_in(rhs, S::Device::default())
+        self.dot_in(rhs, S::Device::default_alloc())
     }
 
-    pub fn dot_in(
+    pub fn dot_in<A: DeviceAllocator<Device = S::Device>>(
         &self,
-        rhs: Tensor<impl Storage<T = S::T, Device = S::Device>, [usize; 2]>,
-        device: S::Device,
-    ) -> Tensor<Vec<S::T, S::Device>, [usize; 2]>
+        rhs: Tensor<impl Storage<T = S::T, Device = S::Device>, C, [usize; 2]>,
+        alloc: A,
+    ) -> Tensor<Vec<S::T, A>, C, [usize; 2]>
     where
         S::T: Zero + One,
-        S::T: GEMM<S::Device>,
+        S::T: GEMM<C>,
     {
         let rows = self.shape[0];
         let cols = rhs.shape[1];
-        let mut v = Vec::with_capacity_in(rows * cols, device);
+        let mut v = Vec::with_capacity_in(rows * cols, alloc);
         unsafe {
             let uninit = Tensor::from_shape_in(
                 self.ctx.clone(),
@@ -160,10 +156,12 @@ where
     }
 }
 
-impl<'a, T: Copy, D: BLASDevice, Dim: Dimension> Tensor<&'a mut Slice<MaybeUninit<T>, D>, Dim> {
+impl<'a, T: Copy, C: BLASContext, Dim: Dimension>
+    Tensor<&'a mut Slice<MaybeUninit<T>, C::Device>, C, Dim>
+{
     /// # Safety
     /// Contents must be initialised
-    pub unsafe fn assume_init(self) -> Tensor<&'a mut Slice<T, D>, Dim> {
+    pub unsafe fn assume_init(self) -> Tensor<&'a mut Slice<T, C::Device>, C, Dim> {
         Tensor {
             shape: self.shape,
             strides: self.strides,
@@ -173,12 +171,12 @@ impl<'a, T: Copy, D: BLASDevice, Dim: Dimension> Tensor<&'a mut Slice<MaybeUnini
     }
 }
 
-impl<'a, T: Copy, D: BLASDevice + Default, Dim: Dimension>
-    Tensor<&'a Slice<MaybeUninit<T>, D>, Dim>
+impl<'a, T: Copy, C: BLASContext, Dim: Dimension>
+    Tensor<&'a Slice<MaybeUninit<T>, C::Device>, C, Dim>
 {
     /// # Safety
     /// Contents must be initialised
-    pub unsafe fn assume_init(self) -> Tensor<&'a Slice<T, D>, Dim> {
+    pub unsafe fn assume_init(self) -> Tensor<&'a Slice<T, C::Device>, C, Dim> {
         Tensor {
             shape: self.shape,
             strides: self.strides,
@@ -188,23 +186,23 @@ impl<'a, T: Copy, D: BLASDevice + Default, Dim: Dimension>
     }
 }
 
-pub fn gemm_uninit<F: GEMM<D> + Zero, D: BLASDevice>(
+pub fn gemm_uninit<F: GEMM<C> + Zero, C: BLASContext>(
     alpha: F,
-    a: Tensor<impl Storage<T = F, Device = D>, [usize; 2]>,
-    b: Tensor<impl Storage<T = F, Device = D>, [usize; 2]>,
-    c: Tensor<&mut Slice<MaybeUninit<F>, D>, [usize; 2]>,
+    a: Tensor<impl Storage<T = F, Device = C::Device>, C, [usize; 2]>,
+    b: Tensor<impl Storage<T = F, Device = C::Device>, C, [usize; 2]>,
+    c: Tensor<&mut Slice<MaybeUninit<F>, C::Device>, C, [usize; 2]>,
 ) {
     // Safety:
     // Specifying beta == 0.0 should allow c to be safely read while uninitialised
     unsafe { gemm(alpha, a, b, F::zero(), c.assume_init()) }
 }
 
-pub fn gemm<F: GEMM<D>, D: BLASDevice>(
+pub fn gemm<F: GEMM<C> + Zero, C: BLASContext>(
     alpha: F,
-    a: Tensor<impl Storage<T = F, Device = D>, [usize; 2]>,
-    b: Tensor<impl Storage<T = F, Device = D>, [usize; 2]>,
+    a: Tensor<impl Storage<T = F, Device = C::Device>, C, [usize; 2]>,
+    b: Tensor<impl Storage<T = F, Device = C::Device>, C, [usize; 2]>,
     beta: F,
-    c: Tensor<&mut Slice<F, D>, [usize; 2]>,
+    c: Tensor<&mut Slice<F, C::Device>, C, [usize; 2]>,
 ) {
     let [rowsa, colsa] = a.shape;
     let [rowsb, colsb] = b.shape;
@@ -260,7 +258,7 @@ mod tests {
 
     use crate::{
         tensor::{gemm, Tensor},
-        vec::Vec,
+        vec::{vec_from_host, Vec},
     };
 
     #[test]
@@ -354,11 +352,11 @@ mod tests {
 
     #[test]
     fn matmul_cuda() {
-        use crate::device::cuda::{Context, CudaOwned};
         use crate::blas::cublas::CublasContext;
+        use crate::device::cuda::{Context, Stream};
 
         let _ctx = Context::quick_init().unwrap();
-        let cuda = CudaOwned::new().unwrap();
+        let cuda = Stream::new().unwrap();
         let cuda = cuda.deref();
 
         // column major
@@ -375,6 +373,36 @@ mod tests {
 
         let mut out = vec![0.0_f32; 6];
         c.data.copy_to_host(&mut out);
+
+        assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
+    }
+
+    #[test]
+    fn matmul_cuda_global() {
+        use crate::blas::cublas::CublasContext;
+        use crate::device::cuda::{with_stream, Context, Cuda, Stream};
+
+        let _ctx = Context::quick_init().unwrap();
+        let cuda = Stream::new().unwrap();
+
+        let out = with_stream(&cuda, |_cuda| {
+            // column major
+            let a = vec_from_host::<f32, Cuda>(&[0., 2., 4., 1., 3., 5.]);
+            let b = vec_from_host::<f32, Cuda>(&[0., 2., 1., 3.]);
+
+            let ctx = CublasContext::new();
+            let ctx = cuda.init_cublas(&ctx);
+
+            let a = Tensor::from_shape_in(ctx, [3, 2], a);
+            let b = Tensor::from_shape_in(ctx, [2, 2], b);
+
+            let c = a.dot(b);
+
+            let mut out = vec![0.0_f32; 6];
+            c.data.copy_to_host(&mut out);
+
+            out
+        });
 
         assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
     }
@@ -411,11 +439,11 @@ mod tests {
 
     #[test]
     fn matmul_cuda2() {
-        use crate::device::cuda::{Context, CudaOwned};
         use crate::blas::cublas::CublasContext;
+        use crate::device::cuda::{Context, Stream};
 
         let _ctx = Context::quick_init().unwrap();
-        let cuda = CudaOwned::new().unwrap();
+        let cuda = Stream::new().unwrap();
         let cuda = cuda.deref();
 
         // column major

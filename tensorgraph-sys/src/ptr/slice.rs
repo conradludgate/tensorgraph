@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    device::{cpu::Cpu, Device, DevicePtr},
+    device::{cpu::Cpu, DefaultDeviceAllocator, Device, DevicePtr},
     vec::Vec,
 };
 
@@ -93,12 +93,12 @@ impl<T: Copy, D: Device> Slice<MaybeUninit<T>, D> {
     }
 }
 
-impl<T: Copy, D: Device + Default> ToOwned for Slice<T, D> {
-    type Owned = Vec<T, D>;
+impl<T: Copy, D: DefaultDeviceAllocator> ToOwned for Slice<T, D> {
+    type Owned = Vec<T, D::Alloc>;
 
     fn to_owned(&self) -> Self::Owned {
         unsafe {
-            let mut v = Vec::with_capacity(self.len());
+            let mut v = Vec::with_capacity_in(self.len(), D::default_alloc());
             let buf = &mut v.space_capacity_mut()[..self.len()];
             buf.init_from_slice(self);
             v.set_len(self.len());
@@ -107,7 +107,7 @@ impl<T: Copy, D: Device + Default> ToOwned for Slice<T, D> {
     }
 }
 
-impl<T, A: Allocator> Deref for Slice<T, Cpu<A>> {
+impl<T> Deref for Slice<T, Cpu> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -115,7 +115,7 @@ impl<T, A: Allocator> Deref for Slice<T, Cpu<A>> {
     }
 }
 
-impl<T, A: Allocator> DerefMut for Slice<T, Cpu<A>> {
+impl<T> DerefMut for Slice<T, Cpu> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
@@ -159,26 +159,26 @@ where
     }
 }
 
-impl<T, A: Allocator, const N: usize> AsRef<Slice<T, Cpu<A>>> for [T; N] {
-    fn as_ref(&self) -> &Slice<T, Cpu<A>> {
-        unsafe { &*(self.as_slice() as *const [T] as *const Slice<T, Cpu<A>>) }
+impl<T, const N: usize> AsRef<Slice<T, Cpu>> for [T; N] {
+    fn as_ref(&self) -> &Slice<T, Cpu> {
+        unsafe { &*(self.as_slice() as *const [T] as *const Slice<T, Cpu>) }
     }
 }
 
-impl<T, A: Allocator, const N: usize> AsMut<Slice<T, Cpu<A>>> for [T; N] {
-    fn as_mut(&mut self) -> &mut Slice<T, Cpu<A>> {
-        unsafe { &mut *(self.as_mut_slice() as *mut [T] as *mut Slice<T, Cpu<A>>) }
+impl<T, const N: usize> AsMut<Slice<T, Cpu>> for [T; N] {
+    fn as_mut(&mut self) -> &mut Slice<T, Cpu> {
+        unsafe { &mut *(self.as_mut_slice() as *mut [T] as *mut Slice<T, Cpu>) }
     }
 }
 
-impl<T, A: Allocator> AsRef<Slice<T, Cpu<A>>> for std::vec::Vec<T, A> {
-    fn as_ref(&self) -> &Slice<T, Cpu<A>> {
-        unsafe { &*(self.as_slice() as *const [T] as *const Slice<T, Cpu<A>>) }
+impl<T, A: Allocator> AsRef<Slice<T, Cpu>> for std::vec::Vec<T, A> {
+    fn as_ref(&self) -> &Slice<T, Cpu> {
+        unsafe { &*(self.as_slice() as *const [T] as *const Slice<T, Cpu>) }
     }
 }
 
-impl<T, A: Allocator> AsMut<Slice<T, Cpu<A>>> for std::vec::Vec<T, A> {
-    fn as_mut(&mut self) -> &mut Slice<T, Cpu<A>> {
-        unsafe { &mut *(self.as_mut_slice() as *mut [T] as *mut Slice<T, Cpu<A>>) }
+impl<T, A: Allocator> AsMut<Slice<T, Cpu>> for std::vec::Vec<T, A> {
+    fn as_mut(&mut self) -> &mut Slice<T, Cpu> {
+        unsafe { &mut *(self.as_mut_slice() as *mut [T] as *mut Slice<T, Cpu>) }
     }
 }

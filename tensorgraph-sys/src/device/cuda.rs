@@ -1,4 +1,4 @@
-use std::{ffi::c_void, ops::Deref};
+use std::ffi::c_void;
 
 use cust::{
     error::{CudaError, CudaResult},
@@ -7,136 +7,20 @@ use cust::{
 
 use crate::ptr::{non_null::NonNull, slice::Slice};
 
-use super::{Device, DevicePtr};
+use super::{Device, DeviceAllocator, DevicePtr};
 
 mod context;
+mod global;
 mod stream;
 // pub mod global;
-pub use context::{Context, SharedContext, AttachedContext, FloatingContext};
-pub use stream::{SharedStream, Stream, with_stream, get_stream};
+pub use context::{AttachedContext, Context, FloatingContext, SharedContext};
+pub use global::{get_stream, with_stream};
+pub use stream::{SharedStream, Stream};
 
-pub struct CudaOwned {
-    stream: Stream,
-}
+pub struct Cuda;
 
-impl CudaOwned {
-    pub fn new() -> CudaResult<Self> {
-        let stream = Stream::new()?;
-
-        Ok(CudaOwned { stream })
-    }
-}
-
-impl Deref for CudaOwned {
-    type Target = Cuda;
-
-    fn deref(&self) -> &Cuda {
-        Cuda::with_stream(&self.stream)
-    }
-}
-
-pub struct Cuda {
-    stream: SharedStream,
-}
-
-impl Cuda {
-    pub fn with_stream(stream: &SharedStream) -> &Self {
-        unsafe { &*(stream as *const SharedStream as *const Self) }
-    }
-
-    #[cfg(feature = "cublas")]
-    pub fn init_cublas<'a>(
-        &'a self,
-        ctx: &'a crate::blas::cublas::CublasContext,
-    ) -> &'a crate::blas::cublas::SharedCublasContext {
-        ctx.with_stream(Some(&self.stream))
-    }
-}
-
-impl<'a> Device for &'a Cuda {
+impl Device for Cuda {
     type Ptr<T: ?Sized> = DevicePointer<T>;
-    type AllocError = CudaError;
-
-    unsafe fn allocate(&self, layout: std::alloc::Layout) -> CudaResult<NonNull<[u8], Self>> {
-        let size = layout.size();
-        if size == 0 {
-            return Err(CudaError::InvalidMemoryAllocation);
-        }
-
-        let mut ptr: *mut c_void = std::ptr::null_mut();
-        cust_raw::cuMemAllocAsync(
-            &mut ptr as *mut *mut c_void as *mut u64,
-            size,
-            self.stream.inner(),
-        )
-        .to_cuda_result()?;
-        let ptr = std::ptr::from_raw_parts_mut(ptr as *mut (), size);
-        Ok(NonNull::new_unchecked(DevicePointer::wrap(ptr)))
-    }
-
-    unsafe fn allocate_zeroed(
-        &self,
-        layout: std::alloc::Layout,
-    ) -> CudaResult<NonNull<[u8], Self>> {
-        let size = layout.size();
-        let ptr = self.allocate(layout)?;
-        cust_raw::cuMemsetD8Async(d_ptr(ptr), 0, size, self.stream.inner()).to_cuda_result()?;
-        Ok(ptr)
-    }
-
-    unsafe fn deallocate(&self, ptr: NonNull<u8, Self>, _layout: std::alloc::Layout) {
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner())
-            .to_cuda_result()
-            .unwrap();
-    }
-
-    unsafe fn grow(
-        &self,
-        ptr: NonNull<u8, Self>,
-        old_layout: std::alloc::Layout,
-        new_layout: std::alloc::Layout,
-    ) -> CudaResult<NonNull<[u8], Self>> {
-        let new = self.allocate(new_layout)?;
-
-        let size = old_layout.size();
-        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.stream.inner())
-            .to_cuda_result()?;
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner()).to_cuda_result()?;
-
-        Ok(new)
-    }
-
-    unsafe fn grow_zeroed(
-        &self,
-        ptr: NonNull<u8, Self>,
-        old_layout: std::alloc::Layout,
-        new_layout: std::alloc::Layout,
-    ) -> CudaResult<NonNull<[u8], Self>> {
-        let new = self.allocate_zeroed(new_layout)?;
-
-        let size = old_layout.size();
-        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.stream.inner())
-            .to_cuda_result()?;
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner()).to_cuda_result()?;
-
-        Ok(new)
-    }
-
-    unsafe fn shrink(
-        &self,
-        ptr: NonNull<u8, Self>,
-        _old_layout: std::alloc::Layout,
-        new_layout: std::alloc::Layout,
-    ) -> CudaResult<NonNull<[u8], Self>> {
-        let size = new_layout.size();
-        let new = self.allocate(new_layout)?;
-
-        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.stream.inner())
-            .to_cuda_result()?;
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.stream.inner()).to_cuda_result()?;
-
-        Ok(new)
-    }
 
     fn copy_from_host<T: Copy>(from: &[T], to: &mut crate::ptr::slice::Slice<T, Self>) {
         assert_eq!(from.len(), to.len());
@@ -187,6 +71,88 @@ impl<'a> Device for &'a Cuda {
     }
 }
 
+impl<'a> DeviceAllocator for &'a SharedStream {
+    type AllocError = CudaError;
+    type Device = Cuda;
+
+    unsafe fn allocate(
+        &self,
+        layout: std::alloc::Layout,
+    ) -> CudaResult<NonNull<[u8], Self::Device>> {
+        let size = layout.size();
+        if size == 0 {
+            return Err(CudaError::InvalidMemoryAllocation);
+        }
+
+        let mut ptr: *mut c_void = std::ptr::null_mut();
+        cust_raw::cuMemAllocAsync(&mut ptr as *mut *mut c_void as *mut u64, size, self.inner())
+            .to_cuda_result()?;
+        let ptr = std::ptr::from_raw_parts_mut(ptr as *mut (), size);
+        Ok(NonNull::new_unchecked(DevicePointer::wrap(ptr)))
+    }
+
+    unsafe fn allocate_zeroed(
+        &self,
+        layout: std::alloc::Layout,
+    ) -> CudaResult<NonNull<[u8], Self::Device>> {
+        let size = layout.size();
+        let ptr = self.allocate(layout)?;
+        cust_raw::cuMemsetD8Async(d_ptr(ptr), 0, size, self.inner()).to_cuda_result()?;
+        Ok(ptr)
+    }
+
+    unsafe fn deallocate(&self, ptr: NonNull<u8, Self::Device>, _layout: std::alloc::Layout) {
+        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner())
+            .to_cuda_result()
+            .unwrap();
+    }
+
+    unsafe fn grow(
+        &self,
+        ptr: NonNull<u8, Self::Device>,
+        old_layout: std::alloc::Layout,
+        new_layout: std::alloc::Layout,
+    ) -> CudaResult<NonNull<[u8], Self::Device>> {
+        let new = self.allocate(new_layout)?;
+
+        let size = old_layout.size();
+        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.inner()).to_cuda_result()?;
+        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner()).to_cuda_result()?;
+
+        Ok(new)
+    }
+
+    unsafe fn grow_zeroed(
+        &self,
+        ptr: NonNull<u8, Self::Device>,
+        old_layout: std::alloc::Layout,
+        new_layout: std::alloc::Layout,
+    ) -> CudaResult<NonNull<[u8], Self::Device>> {
+        let new = self.allocate_zeroed(new_layout)?;
+
+        let size = old_layout.size();
+        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.inner()).to_cuda_result()?;
+        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner()).to_cuda_result()?;
+
+        Ok(new)
+    }
+
+    unsafe fn shrink(
+        &self,
+        ptr: NonNull<u8, Self::Device>,
+        _old_layout: std::alloc::Layout,
+        new_layout: std::alloc::Layout,
+    ) -> CudaResult<NonNull<[u8], Self::Device>> {
+        let size = new_layout.size();
+        let new = self.allocate(new_layout)?;
+
+        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.inner()).to_cuda_result()?;
+        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner()).to_cuda_result()?;
+
+        Ok(new)
+    }
+}
+
 impl<T: ?Sized> DevicePtr<T> for DevicePointer<T> {
     fn as_raw(mut self) -> *mut T {
         self.as_raw_mut()
@@ -209,14 +175,14 @@ impl<T: ?Sized> DevicePtr<T> for DevicePointer<T> {
         let dev_slice: *mut [u8] =
             std::ptr::from_raw_parts_mut(self.as_raw() as *mut (), std::mem::size_of::<T>());
         let dev_slice = DevicePointer::from_raw(dev_slice);
-        <&Cuda>::copy_from_host(&*host_slice, Slice::from_slice_ptr_mut(dev_slice))
+        Cuda::copy_from_host(&*host_slice, Slice::from_slice_ptr_mut(dev_slice))
     }
 }
 
-fn d_ptr(ptr: NonNull<[u8], &Cuda>) -> cust_raw::CUdeviceptr {
+fn d_ptr(ptr: NonNull<[u8], Cuda>) -> cust_raw::CUdeviceptr {
     d_ptr2(ptr.as_ptr())
 }
-fn d_ptr1(ptr: NonNull<u8, &Cuda>) -> cust_raw::CUdeviceptr {
+fn d_ptr1(ptr: NonNull<u8, Cuda>) -> cust_raw::CUdeviceptr {
     d_ptr3(ptr.as_ptr())
 }
 fn d_ptr2(mut ptr: DevicePointer<[u8]>) -> cust_raw::CUdeviceptr {

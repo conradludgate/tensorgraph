@@ -1,24 +1,21 @@
-use std::ops::Deref;
-
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use tensorgraph_sys::{
-    blas::{BLASDevice, GEMM},
-    device::cpu::Cpu,
+    blas::{cpu::CpuContext, BLASContext, GEMM},
+    device::DefaultDeviceAllocator,
     tensor::{gemm, Tensor},
-    vec::Vec,
+    vec::{vec_from_host, Vec},
 };
 
 /// Performs 1000 matrix mulitplications on a 256x256 matrix
-pub fn matmul_1000_256<D: BLASDevice + Clone>(
+pub fn matmul_1000_256<D: DefaultDeviceAllocator, C: BLASContext<Device = D> + Copy>(
     init: &[f64],
-    device: D,
-    ctx: D::Context,
-) -> Vec<f64, D>
+    ctx: C,
+) -> Vec<f64, D::Alloc>
 where
-    D::Context: Copy,
-    f64: GEMM<D>,
+    f64: GEMM<C>,
+    D::Alloc: Clone,
 {
-    let a = Vec::copy_from_host_in(init, device);
+    let a = vec_from_host::<f64, D>(init);
     let b = a.clone();
     let c = b.clone();
 
@@ -45,7 +42,7 @@ pub fn matmul(c: &mut Criterion) {
     }
 
     let cpu = |b: &mut Bencher| {
-        b.iter(|| black_box(matmul_1000_256(&init, Cpu::default(), ())));
+        b.iter(|| black_box(matmul_1000_256(&init, CpuContext)));
     };
 
     #[cfg(feature = "openblas")]
@@ -63,21 +60,22 @@ pub fn matmul(c: &mut Criterion) {
     #[cfg(feature = "cublas")]
     {
         use tensorgraph_sys::blas::cublas::CublasContext;
-        use tensorgraph_sys::device::cuda::{Context, CudaOwned};
+        use tensorgraph_sys::device::cuda::{with_stream, Context, Stream};
 
         let _ctx = Context::quick_init().unwrap();
-        let cuda = CudaOwned::new().unwrap();
-        let cuda = cuda.deref();
-        let ctx = CublasContext::new();
-        let ctx = cuda.init_cublas(&ctx);
 
-        group.bench_function("cublas", |b| {
-            b.iter(|| {
-                // includes the time to sync data in the benchmark
-                let mut out = vec![0.0f64; 256 * 256];
-                matmul_1000_256(&init, cuda, ctx).copy_to_host(&mut out);
+        with_stream(&Stream::new().unwrap(), |cuda| {
+            let ctx = CublasContext::new();
+            let ctx = cuda.init_cublas(&ctx);
 
-                black_box(out)
+            group.bench_function("cublas", |b| {
+                b.iter(|| {
+                    // includes the time to sync data in the benchmark
+                    let mut out = vec![0.0f64; 256 * 256];
+                    matmul_1000_256(&init, ctx).copy_to_host(&mut out);
+
+                    black_box(out)
+                });
             });
         });
     }

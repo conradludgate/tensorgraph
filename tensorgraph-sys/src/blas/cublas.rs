@@ -2,13 +2,13 @@ use std::{ops::Deref, ptr::NonNull};
 
 use cust::memory::DevicePointer;
 use rcublas_sys::{
-    cublasContext, cublasCreate_v2, cublasDestroy_v2, cublasDgemm_v2, cublasSgemm_v2,
-    cublasStatus_t, cublasSetStream_v2, cublasHandle_t,
+    cublasContext, cublasCreate_v2, cublasDestroy_v2, cublasDgemm_v2, cublasHandle_t,
+    cublasSetStream_v2, cublasSgemm_v2, cublasStatus_t,
 };
 
 use crate::device::cuda::{Cuda, SharedStream};
 
-use super::{BLASDevice, GEMM};
+use super::{BLASContext, GEMM};
 
 pub struct CublasContext {
     inner: NonNull<cublasContext>,
@@ -73,8 +73,8 @@ impl SharedCublasContext {
     }
 }
 
-impl<'a> BLASDevice for &'a Cuda {
-    type Context = &'a SharedCublasContext;
+impl<'a> BLASContext for &'a SharedCublasContext {
+    type Device = Cuda;
 }
 
 impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
@@ -87,9 +87,9 @@ impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
     }
 }
 
-impl<'a> GEMM<&'a Cuda> for f32 {
+impl<'a> GEMM<&'a SharedCublasContext> for f32 {
     unsafe fn gemm(
-        handle: &'a SharedCublasContext,
+        handle: &SharedCublasContext,
         transa: super::MatrixOp,
         transb: super::MatrixOp,
         m: i32,
@@ -125,9 +125,9 @@ impl<'a> GEMM<&'a Cuda> for f32 {
     }
 }
 
-impl<'a> GEMM<&'a Cuda> for f64 {
+impl<'a> GEMM<&'a SharedCublasContext> for f64 {
     unsafe fn gemm(
-        handle: &'a SharedCublasContext,
+        handle: &SharedCublasContext,
         transa: super::MatrixOp,
         transb: super::MatrixOp,
         m: i32,
