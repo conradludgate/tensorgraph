@@ -2,6 +2,10 @@
 name = "tensorgraph-sys"
 version = "0.1.0"
 edition = "2021"
+description = "backbone for tensorgraph, providing memory manamagement across devices"
+repository = "https://github.com/conradludgate/tensorgraph"
+keywords = ["numerics", "machine-learning", "neural-network", "cuda", "blas"]
+license-file = "../LICENSE"
 
 [dependencies]
 

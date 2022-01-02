@@ -2,6 +2,10 @@
 name = "tensorgraph-math"
 version = "0.1.0"
 edition = "2021"
+description = "backbone for tensorgraph, providing math primitives"
+repository = "https://github.com/conradludgate/tensorgraph"
+keywords = ["numerics", "machine-learning", "neural-network", "cuda", "blas"]
+license-file = "../LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
