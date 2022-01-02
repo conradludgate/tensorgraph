@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-num-traits = "0.2"
 
 # cuda
 cust = { version = "0.2", optional = true }
@@ -33,11 +32,3 @@ netlib = ["blas-sys", "blas-src/netlib"]
 openblas = ["blas-sys", "blas-src/openblas"]
 
 matrixmultiply_threading = ["matrixmultiply/threading"]
-
-[dev-dependencies]
-approx = "0.5.0"
-criterion = { version = "0.3", features = ["html_reports"] }
-
-[[bench]]
-name = "benches"
-harness = false

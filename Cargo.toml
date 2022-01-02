@@ -1,2 +1,5 @@
 [workspace]
-members = ["tensorgraph-sys"]
+members = [
+    "tensorgraph-sys",
+    "tensorgraph-math",
+]

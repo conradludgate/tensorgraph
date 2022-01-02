@@ -2,13 +2,16 @@ use std::mem::MaybeUninit;
 
 use num_traits::{One, Zero};
 
-use crate::{
+use tensorgraph_sys::{
     blas::{BLASContext, DefaultBLASContext, MatrixOp, GEMM},
     device::{DefaultDeviceAllocator, DeviceAllocator},
-    dims::{Dimension, RemoveDim},
     ptr::slice::Slice,
-    storage::{IntoOwned, Storage, StorageMut},
     vec::Vec,
+};
+
+use crate::{
+    dims::{Dimension, RemoveDim},
+    storage::{IntoOwned, Storage, StorageMut},
 };
 
 pub struct Tensor<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> {
@@ -256,10 +259,9 @@ fn lead(s: [usize; 2]) -> (MatrixOp, i32) {
 mod tests {
     use std::ops::Deref;
 
-    use crate::{
-        tensor::{gemm, Tensor},
-        vec::{vec_from_host, Vec},
-    };
+    use tensorgraph_sys::vec::{vec_from_host, Vec};
+
+    use crate::tensor::{gemm, Tensor};
 
     #[test]
     fn matmul() {
@@ -353,8 +355,8 @@ mod tests {
     #[test]
     #[cfg(feature = "cublas")]
     fn matmul_cuda() {
-        use crate::blas::cublas::CublasContext;
-        use crate::device::cuda::{Context, Stream};
+        use tensorgraph_sys::blas::cublas::CublasContext;
+        use tensorgraph_sys::device::cuda::{Context, Stream};
 
         let _ctx = Context::quick_init().unwrap();
         let cuda = Stream::new().unwrap();
@@ -381,8 +383,8 @@ mod tests {
     #[test]
     #[cfg(feature = "cublas")]
     fn matmul_cuda_global() {
-        use crate::blas::cublas::CublasContext;
-        use crate::device::cuda::{with_stream, Context, Cuda, Stream};
+        use tensorgraph_sys::blas::cublas::CublasContext;
+        use tensorgraph_sys::device::cuda::{with_stream, Context, Cuda, Stream};
 
         let _ctx = Context::quick_init().unwrap();
         let cuda = Stream::new().unwrap();
@@ -442,8 +444,8 @@ mod tests {
     #[test]
     #[cfg(feature = "cublas")]
     fn matmul_cuda2() {
-        use crate::blas::cublas::CublasContext;
-        use crate::device::cuda::{Context, Stream};
+        use tensorgraph_sys::blas::cublas::CublasContext;
+        use tensorgraph_sys::device::cuda::{Context, Stream};
 
         let _ctx = Context::quick_init().unwrap();
         let cuda = Stream::new().unwrap();

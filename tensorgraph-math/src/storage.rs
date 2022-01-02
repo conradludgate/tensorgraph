@@ -1,6 +1,6 @@
 use std::alloc::Allocator;
 
-use crate::{
+use tensorgraph_sys::{
     device::{cpu::Cpu, DefaultDeviceAllocator, Device, DeviceAllocator},
     ptr::slice::Slice,
     vec::Vec,

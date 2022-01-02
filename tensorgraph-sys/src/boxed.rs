@@ -23,6 +23,7 @@ impl<T: ?Sized, A: DeviceAllocator> Box<T, A> {
         let alloc = std::ptr::read(&b.alloc);
         (b.ptr, alloc)
     }
+
     pub unsafe fn from_raw_parts(ptr: NonNull<T, A::Device>, alloc: A) -> Self {
         Self {
             ptr,
@@ -30,6 +31,7 @@ impl<T: ?Sized, A: DeviceAllocator> Box<T, A> {
             _marker: PhantomData,
         }
     }
+
     pub fn allocator(&self) -> &A {
         &self.alloc
     }

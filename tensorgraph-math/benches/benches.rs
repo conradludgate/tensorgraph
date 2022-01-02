@@ -2,9 +2,10 @@ use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use tensorgraph_sys::{
     blas::{cpu::CpuContext, BLASContext, GEMM},
     device::DefaultDeviceAllocator,
-    tensor::{gemm, Tensor},
     vec::{vec_from_host, Vec},
 };
+
+use tensorgraph_math::tensor::{gemm, Tensor};
 
 /// Performs 1000 matrix mulitplications on a 256x256 matrix
 pub fn matmul_1000_256<D: DefaultDeviceAllocator, C: BLASContext<Device = D> + Copy>(

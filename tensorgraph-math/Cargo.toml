@@ -1,0 +1,28 @@
+[package]
+name = "tensorgraph-math"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+num-traits = "0.2"
+tensorgraph-sys = { version = "=0.1.0", path = "../tensorgraph-sys" }
+
+[dev-dependencies]
+approx = "0.5.0"
+criterion = { version = "0.3", features = ["html_reports"] }
+
+[[bench]]
+name = "benches"
+harness = false
+
+[features]
+default = ["openblas", "cublas"]
+
+cublas = ["tensorgraph-sys/cublas"]
+accelerate = ["tensorgraph-sys/accelerate"]
+blis = ["tensorgraph-sys/blis"]
+intel-mkl = ["tensorgraph-sys/intel-mkl"]
+netlib = ["tensorgraph-sys/netlib"]
+openblas = ["tensorgraph-sys/openblas"]
