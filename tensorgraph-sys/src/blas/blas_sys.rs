@@ -2,15 +2,14 @@ extern crate blas_src;
 extern crate blas_sys;
 
 use crate::device::cpu::Cpu;
-use std::alloc::Allocator;
 
 use super::{BLASDevice, GEMM};
 
-impl<A: Allocator> BLASDevice for Cpu<A> {
+impl BLASDevice for Cpu {
     type Context = ();
 }
 
-impl<A: Allocator> GEMM<Cpu<A>> for f32 {
+impl GEMM<Cpu> for f32 {
     unsafe fn gemm(
         _ctx: (),
         transa: super::MatrixOp,
@@ -45,7 +44,7 @@ impl<A: Allocator> GEMM<Cpu<A>> for f32 {
     }
 }
 
-impl<A: Allocator> GEMM<Cpu<A>> for f64 {
+impl GEMM<Cpu> for f64 {
     unsafe fn gemm(
         _ctx: (),
         transa: super::MatrixOp,

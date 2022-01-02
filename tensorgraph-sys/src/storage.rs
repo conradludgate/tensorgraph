@@ -1,7 +1,7 @@
 use std::alloc::Allocator;
 
 use crate::{
-    device::{cpu::Cpu, Device},
+    device::{cpu::Cpu, Device, DeviceAllocator, DefaultDeviceAllocator},
     ptr::slice::Slice,
     vec::Vec,
 };
@@ -20,14 +20,14 @@ pub trait StorageMut: Storage + AsMut<Slice<Self::T, Self::Device>> {}
 
 // Vec
 
-impl<T, D: Device> Storage for Vec<T, D> {
+impl<T, A: DeviceAllocator> Storage for Vec<T, A> {
     type T = T;
-    type Device = D;
+    type Device = A::Device;
 }
 
-impl<T, D: Device> StorageMut for Vec<T, D> {}
+impl<T, A: DeviceAllocator> StorageMut for Vec<T, A> {}
 
-impl<T, D: Device> IntoOwned for Vec<T, D> {
+impl<T, A: DeviceAllocator> IntoOwned for Vec<T, A> {
     type Owned = Self;
     fn into_owned(self) -> Self::Owned {
         self
@@ -41,8 +41,8 @@ impl<'a, T, D: Device> Storage for &'a Slice<T, D> {
     type Device = D;
 }
 
-impl<'a, T: Copy, D: Device + Default> IntoOwned for &'a Slice<T, D> {
-    type Owned = Vec<T, D>;
+impl<'a, T: Copy, D: DefaultDeviceAllocator> IntoOwned for &'a Slice<T, D> {
+    type Owned = Vec<T, D::Alloc>;
     fn into_owned(self) -> Self::Owned {
         self.to_owned()
     }
@@ -57,8 +57,8 @@ impl<'a, T, D: Device> Storage for &'a mut Slice<T, D> {
 
 impl<'a, T, D: Device> StorageMut for &'a mut Slice<T, D> {}
 
-impl<'a, T: Copy, D: Device + Default> IntoOwned for &'a mut Slice<T, D> {
-    type Owned = Vec<T, D>;
+impl<'a, T: Copy, D: DefaultDeviceAllocator> IntoOwned for &'a mut Slice<T, D> {
+    type Owned = Vec<T, D::Alloc>;
     fn into_owned(self) -> Self::Owned {
         self.to_owned()
     }
@@ -84,7 +84,7 @@ impl<T, const N: usize> IntoOwned for [T; N] {
 
 impl<T, A: Allocator> Storage for std::vec::Vec<T, A> {
     type T = T;
-    type Device = Cpu<A>;
+    type Device = Cpu;
 }
 
 impl<T, A: Allocator> StorageMut for std::vec::Vec<T, A> {}

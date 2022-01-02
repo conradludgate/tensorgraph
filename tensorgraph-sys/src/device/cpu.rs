@@ -1,80 +1,24 @@
 use std::{
-    alloc::{AllocError, Allocator, Global, Layout},
+    alloc::{AllocError, Allocator, Layout, Global},
     ops::{Deref, DerefMut},
 };
 
 use crate::ptr::slice::Slice;
 
-use super::{Device, DevicePtr, NonNull};
+use super::{Device, DeviceAllocator, DevicePtr, NonNull, DefaultDeviceAllocator};
 
 #[derive(Clone, Copy)]
-pub struct Cpu<A: Allocator = Global> {
-    alloc: A,
-}
+pub struct Cpu;
 
-impl Default for Cpu<Global> {
+impl Default for Cpu {
     fn default() -> Self {
-        Self { alloc: Global }
+        Self
     }
 }
 
-impl<A: Allocator> Cpu<A> {
-    pub fn new(alloc: A) -> Self {
-        Self { alloc }
-    }
-    pub fn alloc(self) -> A {
-        self.alloc
-    }
-}
-
-impl<A: Allocator> Device for Cpu<A> {
+impl Device for Cpu {
     type Ptr<T: ?Sized> = *mut T;
-    type AllocError = AllocError;
-
-    unsafe fn allocate(&self, layout: Layout) -> Result<NonNull<[u8], Self>, AllocError> {
-        Ok(self.alloc.allocate(layout)?.into())
-    }
-
-    unsafe fn allocate_zeroed(&self, layout: Layout) -> Result<NonNull<[u8], Self>, AllocError> {
-        Ok(self.alloc.allocate_zeroed(layout)?.into())
-    }
-
-    unsafe fn deallocate(&self, ptr: NonNull<u8, Self>, layout: Layout) {
-        self.alloc.deallocate(ptr.into(), layout)
-    }
-
-    unsafe fn grow(
-        &self,
-        ptr: NonNull<u8, Self>,
-        old_layout: Layout,
-        new_layout: Layout,
-    ) -> Result<NonNull<[u8], Self>, AllocError> {
-        Ok(self.alloc.grow(ptr.into(), old_layout, new_layout)?.into())
-    }
-
-    unsafe fn grow_zeroed(
-        &self,
-        ptr: NonNull<u8, Self>,
-        old_layout: Layout,
-        new_layout: Layout,
-    ) -> Result<NonNull<[u8], Self>, AllocError> {
-        Ok(self
-            .alloc
-            .grow_zeroed(ptr.into(), old_layout, new_layout)?
-            .into())
-    }
-
-    unsafe fn shrink(
-        &self,
-        ptr: NonNull<u8, Self>,
-        old_layout: Layout,
-        new_layout: Layout,
-    ) -> Result<NonNull<[u8], Self>, AllocError> {
-        Ok(self
-            .alloc
-            .shrink(ptr.into(), old_layout, new_layout)?
-            .into())
-    }
+    const IS_CPU: bool = true;
 
     fn copy_from_host<T: Copy>(from: &[T], to: &mut Slice<T, Self>) {
         to.deref_mut().copy_from_slice(from)
@@ -87,9 +31,12 @@ impl<A: Allocator> Device for Cpu<A> {
     fn copy<T: Copy>(from: &Slice<T, Self>, to: &mut Slice<T, Self>) {
         to.deref_mut().copy_from_slice(from.deref())
     }
+}
 
-    unsafe fn is_cpu() -> bool {
-        true
+impl DefaultDeviceAllocator for Cpu {
+    type Alloc = Global;
+    fn default_alloc() -> Global {
+        Global
     }
 }
 
@@ -110,14 +57,62 @@ impl<T: ?Sized> DevicePtr<T> for *mut T {
     }
 }
 
-impl<T: ?Sized, A: Allocator> From<std::ptr::NonNull<T>> for NonNull<T, Cpu<A>> {
+impl<T: ?Sized> From<std::ptr::NonNull<T>> for NonNull<T, Cpu> {
     fn from(ptr: std::ptr::NonNull<T>) -> Self {
         unsafe { NonNull::new_unchecked(ptr.as_ptr()) }
     }
 }
 
-impl<T: ?Sized, A: Allocator> From<NonNull<T, Cpu<A>>> for std::ptr::NonNull<T> {
-    fn from(ptr: NonNull<T, Cpu<A>>) -> Self {
+impl<T: ?Sized> From<NonNull<T, Cpu>> for std::ptr::NonNull<T> {
+    fn from(ptr: NonNull<T, Cpu>) -> Self {
         unsafe { std::ptr::NonNull::new_unchecked(ptr.as_ptr()) }
+    }
+}
+
+impl<A: Allocator> DeviceAllocator for A {
+    type AllocError = AllocError;
+    type Device = Cpu;
+
+    unsafe fn allocate(&self, layout: Layout) -> Result<NonNull<[u8], Cpu>, AllocError> {
+        Ok(self.allocate(layout)?.into())
+    }
+
+    unsafe fn allocate_zeroed(&self, layout: Layout) -> Result<NonNull<[u8], Cpu>, AllocError> {
+        Ok(self.allocate_zeroed(layout)?.into())
+    }
+
+    unsafe fn deallocate(&self, ptr: NonNull<u8, Cpu>, layout: Layout) {
+        self.deallocate(ptr.into(), layout)
+    }
+
+    unsafe fn grow(
+        &self,
+        ptr: NonNull<u8, Cpu>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8], Cpu>, AllocError> {
+        Ok(self.grow(ptr.into(), old_layout, new_layout)?.into())
+    }
+
+    unsafe fn grow_zeroed(
+        &self,
+        ptr: NonNull<u8, Cpu>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8], Cpu>, AllocError> {
+        Ok(self
+            .grow_zeroed(ptr.into(), old_layout, new_layout)?
+            .into())
+    }
+
+    unsafe fn shrink(
+        &self,
+        ptr: NonNull<u8, Cpu>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8], Cpu>, AllocError> {
+        Ok(self
+            .shrink(ptr.into(), old_layout, new_layout)?
+            .into())
     }
 }

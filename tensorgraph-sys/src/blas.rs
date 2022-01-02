@@ -19,7 +19,7 @@ pub enum MatrixOp {
 }
 
 pub trait BLASDevice: Device {
-    type Context: Clone;
+    type Context<'a>: Clone;
 }
 
 pub trait GEMM<D: BLASDevice>: Sized + Copy {
@@ -28,7 +28,7 @@ pub trait GEMM<D: BLASDevice>: Sized + Copy {
     /// This is often a call across an FFI barrier, so the links or devices need to be
     /// running and may perform UB unchecked by rust
     unsafe fn gemm(
-        ctx: D::Context,
+        ctx: D::Context<'_>,
         transa: MatrixOp,
         transb: MatrixOp,
         m: i32,

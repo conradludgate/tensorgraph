@@ -7,7 +7,7 @@ use crate::{
     dims::{Dimension, RemoveDim},
     ptr::slice::Slice,
     storage::{IntoOwned, Storage, StorageMut},
-    vec::Vec,
+    vec::Vec, device::{DefaultDeviceAllocator, DeviceAllocator},
 };
 
 pub struct Tensor<S: Storage, Dim: Dimension>
@@ -124,27 +124,27 @@ where
     pub fn dot(
         &self,
         rhs: Tensor<impl Storage<T = S::T, Device = S::Device>, [usize; 2]>,
-    ) -> Tensor<Vec<S::T, S::Device>, [usize; 2]>
+    ) -> Tensor<Vec<S::T, <S::Device as DefaultDeviceAllocator>::Alloc>, [usize; 2]>
     where
         S::T: Zero + One,
-        S::Device: Default,
+        S::Device: DefaultDeviceAllocator,
         S::T: GEMM<S::Device>,
     {
-        self.dot_in(rhs, S::Device::default())
+        self.dot_in(rhs, S::Device::default_alloc())
     }
 
-    pub fn dot_in(
+    pub fn dot_in<A: DeviceAllocator<Device = S::Device>>(
         &self,
         rhs: Tensor<impl Storage<T = S::T, Device = S::Device>, [usize; 2]>,
-        device: S::Device,
-    ) -> Tensor<Vec<S::T, S::Device>, [usize; 2]>
+        alloc: A,
+    ) -> Tensor<Vec<S::T, A>, [usize; 2]>
     where
         S::T: Zero + One,
         S::T: GEMM<S::Device>,
     {
         let rows = self.shape[0];
         let cols = rhs.shape[1];
-        let mut v = Vec::with_capacity_in(rows * cols, device);
+        let mut v = Vec::with_capacity_in(rows * cols, alloc);
         unsafe {
             let uninit = Tensor::from_shape_in(
                 self.ctx.clone(),

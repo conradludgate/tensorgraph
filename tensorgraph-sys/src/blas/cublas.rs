@@ -73,8 +73,8 @@ impl SharedCublasContext {
     }
 }
 
-impl<'a> BLASDevice for &'a Cuda {
-    type Context = &'a SharedCublasContext;
+impl BLASDevice for Cuda {
+    type Context = SharedCublasContext;
 }
 
 impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
@@ -87,9 +87,9 @@ impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
     }
 }
 
-impl<'a> GEMM<&'a Cuda> for f32 {
+impl GEMM<Cuda> for f32 {
     unsafe fn gemm(
-        handle: &'a SharedCublasContext,
+        handle: &SharedCublasContext,
         transa: super::MatrixOp,
         transb: super::MatrixOp,
         m: i32,
@@ -125,9 +125,9 @@ impl<'a> GEMM<&'a Cuda> for f32 {
     }
 }
 
-impl<'a> GEMM<&'a Cuda> for f64 {
+impl GEMM<Cuda> for f64 {
     unsafe fn gemm(
-        handle: &'a SharedCublasContext,
+        handle: &SharedCublasContext,
         transa: super::MatrixOp,
         transb: super::MatrixOp,
         m: i32,
