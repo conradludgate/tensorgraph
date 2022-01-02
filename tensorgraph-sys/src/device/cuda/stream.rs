@@ -45,6 +45,14 @@ impl SharedStream {
     pub(crate) fn inner(&self) -> CUstream {
         self as *const _ as *mut _
     }
+
+    #[cfg(feature = "cublas")]
+    pub fn init_cublas<'a>(
+        &'a self,
+        ctx: &'a crate::blas::cublas::CublasContext,
+    ) -> &'a crate::blas::cublas::SharedCublasContext {
+        ctx.with_stream(Some(self))
+    }
 }
 
 #[thread_local]

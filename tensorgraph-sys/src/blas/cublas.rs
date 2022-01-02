@@ -8,7 +8,7 @@ use rcublas_sys::{
 
 use crate::device::cuda::{Cuda, SharedStream};
 
-use super::{BLASDevice, GEMM};
+use super::{GEMM, BLASContext};
 
 pub struct CublasContext {
     inner: NonNull<cublasContext>,
@@ -73,8 +73,8 @@ impl SharedCublasContext {
     }
 }
 
-impl BLASDevice for Cuda {
-    type Context = SharedCublasContext;
+impl<'a> BLASContext for &'a SharedCublasContext {
+    type Device = Cuda;
 }
 
 impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
@@ -87,7 +87,7 @@ impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
     }
 }
 
-impl GEMM<Cuda> for f32 {
+impl<'a> GEMM<&'a SharedCublasContext> for f32 {
     unsafe fn gemm(
         handle: &SharedCublasContext,
         transa: super::MatrixOp,
@@ -125,7 +125,7 @@ impl GEMM<Cuda> for f32 {
     }
 }
 
-impl GEMM<Cuda> for f64 {
+impl<'a> GEMM<&'a SharedCublasContext> for f64 {
     unsafe fn gemm(
         handle: &SharedCublasContext,
         transa: super::MatrixOp,

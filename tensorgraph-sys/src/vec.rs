@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    device::{cpu::Cpu, Device, DeviceAllocator, DevicePtr},
+    device::{Device, DeviceAllocator, DevicePtr},
     ptr::{non_null::NonNull, slice::Slice},
     zero::Zero,
 };
@@ -38,7 +38,7 @@ impl<T, A: DeviceAllocator> Drop for Vec<T, A> {
                 }
             }
             let (layout, _) = Layout::new::<T>().repeat(self.capacity()).unwrap();
-            self.device.deallocate(self.buf.cast(), layout)
+            self.alloc.deallocate(self.buf.cast(), layout)
         }
     }
 }
@@ -167,7 +167,7 @@ impl<T, A: DeviceAllocator> Vec<T, A> {
             let new_layout = layout.repeat(new).unwrap().0;
 
             let data = self
-                .device
+                .alloc
                 .grow(self.buf.cast(), old_layout, new_layout)
                 .unwrap()
                 .cast();
@@ -190,8 +190,7 @@ impl<T, A: Allocator> From<std::vec::Vec<T, A>> for Vec<T, A> {
             let (ptr, len, cap, alloc) = v.into_raw_parts_with_alloc();
             let data = NonNull::new_unchecked(ptr);
             let buf = NonNull::slice_from_raw_parts(data, cap);
-            let device = Cpu::new(alloc);
-            Self::from_raw_parts_in(buf, len, device)
+            Self::from_raw_parts_in(buf, len, alloc)
         }
     }
 }
@@ -200,7 +199,7 @@ impl<T, A: Allocator> From<Vec<T, A>> for std::vec::Vec<T, A> {
     fn from(v: Vec<T, A>) -> Self {
         unsafe {
             let v = ManuallyDrop::new(v);
-            let alloc = std::ptr::read(&v.device).alloc();
+            let alloc = std::ptr::read(&v.alloc);
             let (ptr, cap) = v.buf.as_ptr().to_raw_parts();
             let ptr = ptr.cast();
             Self::from_raw_parts_in(ptr, v.len, cap, alloc)

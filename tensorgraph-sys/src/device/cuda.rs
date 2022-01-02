@@ -107,7 +107,7 @@ impl Device for Cuda {
 //     }
 // }
 
-impl DeviceAllocator for SharedStream {
+impl<'a> DeviceAllocator for &'a SharedStream {
     type AllocError = CudaError;
     type Device = Cuda;
 

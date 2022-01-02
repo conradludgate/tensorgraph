@@ -1,24 +1,25 @@
-use std::ops::Deref;
+#![feature(allocator_api)]
+
+use std::{alloc::Global, ops::Deref};
 
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use tensorgraph_sys::{
-    blas::{BLASDevice, GEMM},
-    device::cpu::Cpu,
+    blas::{blas_sys::CpuContext, BLASContext, GEMM},
+    device::DeviceAllocator,
     tensor::{gemm, Tensor},
     vec::Vec,
 };
 
 /// Performs 1000 matrix mulitplications on a 256x256 matrix
-pub fn matmul_1000_256<D: BLASDevice + Clone>(
+pub fn matmul_1000_256<A: DeviceAllocator + Clone, C: BLASContext<Device = A::Device> + Copy>(
     init: &[f64],
-    device: D,
-    ctx: D::Context,
-) -> Vec<f64, D>
+    alloc: A,
+    ctx: C,
+) -> Vec<f64, A>
 where
-    D::Context: Copy,
-    f64: GEMM<D>,
+    f64: GEMM<C>,
 {
-    let a = Vec::copy_from_host_in(init, device);
+    let a = Vec::copy_from_host_in(init, alloc);
     let b = a.clone();
     let c = b.clone();
 
@@ -45,7 +46,7 @@ pub fn matmul(c: &mut Criterion) {
     }
 
     let cpu = |b: &mut Bencher| {
-        b.iter(|| black_box(matmul_1000_256(&init, Cpu::default(), ())));
+        b.iter(|| black_box(matmul_1000_256(&init, Global, CpuContext)));
     };
 
     #[cfg(feature = "openblas")]
@@ -63,10 +64,10 @@ pub fn matmul(c: &mut Criterion) {
     #[cfg(feature = "cublas")]
     {
         use tensorgraph_sys::blas::cublas::CublasContext;
-        use tensorgraph_sys::device::cuda::{Context, CudaOwned};
+        use tensorgraph_sys::device::cuda::{Context, Stream};
 
         let _ctx = Context::quick_init().unwrap();
-        let cuda = CudaOwned::new().unwrap();
+        let cuda = Stream::new().unwrap();
         let cuda = cuda.deref();
         let ctx = CublasContext::new();
         let ctx = cuda.init_cublas(&ctx);
