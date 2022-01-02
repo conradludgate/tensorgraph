@@ -351,6 +351,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cublas")]
     fn matmul_cuda() {
         use crate::blas::cublas::CublasContext;
         use crate::device::cuda::{Context, Stream};
@@ -378,6 +379,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cublas")]
     fn matmul_cuda_global() {
         use crate::blas::cublas::CublasContext;
         use crate::device::cuda::{with_stream, Context, Cuda, Stream};
@@ -431,13 +433,14 @@ mod tests {
             1.1273654067417986,
         ];
 
-        approx::assert_relative_eq!(out[0], expected[0]);
-        approx::assert_relative_eq!(out[1], expected[1]);
-        approx::assert_relative_eq!(out[2], expected[2]);
-        approx::assert_relative_eq!(out[3], expected[3]);
+        assert_eq!(out[0], expected[0]);
+        assert_eq!(out[1], expected[1]);
+        assert_eq!(out[2], expected[2]);
+        assert_eq!(out[3], expected[3]);
     }
 
     #[test]
+    #[cfg(feature = "cublas")]
     fn matmul_cuda2() {
         use crate::blas::cublas::CublasContext;
         use crate::device::cuda::{Context, Stream};
@@ -473,9 +476,9 @@ mod tests {
             1.1273654067417986,
         ];
 
-        approx::assert_relative_eq!(out[0], expected[0]);
-        approx::assert_relative_eq!(out[1], expected[1]);
-        approx::assert_relative_eq!(out[2], expected[2]);
-        approx::assert_relative_eq!(out[3], expected[3]);
+        assert_eq!(out[0], expected[0]);
+        assert_eq!(out[1], expected[1]);
+        assert_eq!(out[2], expected[2]);
+        assert_eq!(out[3], expected[3]);
     }
 }

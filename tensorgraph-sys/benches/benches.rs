@@ -57,6 +57,9 @@ pub fn matmul(c: &mut Criterion) {
     #[cfg(feature = "matrixmultiply")]
     group.bench_function("matrixmultiply", cpu);
 
+    #[cfg(feature = "accelerate")]
+    group.bench_function("accelerate", cpu);
+
     #[cfg(feature = "cublas")]
     {
         use tensorgraph_sys::blas::cublas::CublasContext;
