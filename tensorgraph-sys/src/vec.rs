@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    device::{Device, DeviceAllocator, DevicePtr},
+    device::{Device, DeviceAllocator, DevicePtr, DefaultDeviceAllocator},
     ptr::{non_null::NonNull, slice::Slice},
     zero::Zero,
 };
@@ -53,6 +53,10 @@ impl<T: Copy, A: DeviceAllocator + Clone> Clone for Vec<T, A> {
             vec
         }
     }
+}
+
+pub fn vec_from_host<T: Copy, D: DefaultDeviceAllocator>(slice: &[T]) -> Vec<T, D::Alloc> {
+    Vec::copy_from_host_in(slice, D::default_alloc())
 }
 
 impl<T, A: DeviceAllocator> Vec<T, A> {

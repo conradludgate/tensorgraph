@@ -258,7 +258,7 @@ mod tests {
 
     use crate::{
         tensor::{gemm, Tensor},
-        vec::Vec,
+        vec::{vec_from_host, Vec},
     };
 
     #[test]
@@ -373,6 +373,36 @@ mod tests {
 
         let mut out = vec![0.0_f32; 6];
         c.data.copy_to_host(&mut out);
+
+        assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
+    }
+
+    #[test]
+    fn matmul_cuda_global() {
+        use crate::blas::cublas::CublasContext;
+        use crate::device::cuda::{with_stream, Context, Cuda, Stream};
+
+        let _ctx = Context::quick_init().unwrap();
+        let cuda = Stream::new().unwrap();
+
+        let out = with_stream(&cuda, |_cuda| {
+            // column major
+            let a = vec_from_host::<f32, Cuda>(&[0., 2., 4., 1., 3., 5.]);
+            let b = vec_from_host::<f32, Cuda>(&[0., 2., 1., 3.]);
+
+            let ctx = CublasContext::new();
+            let ctx = cuda.init_cublas(&ctx);
+
+            let a = Tensor::from_shape_in(ctx, [3, 2], a);
+            let b = Tensor::from_shape_in(ctx, [2, 2], b);
+
+            let c = a.dot(b);
+
+            let mut out = vec![0.0_f32; 6];
+            c.data.copy_to_host(&mut out);
+
+            out
+        });
 
         assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
     }

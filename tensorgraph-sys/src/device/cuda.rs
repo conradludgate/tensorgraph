@@ -10,10 +10,12 @@ use crate::ptr::{non_null::NonNull, slice::Slice};
 use super::{Device, DeviceAllocator, DevicePtr};
 
 mod context;
+mod global;
 mod stream;
 // pub mod global;
 pub use context::{AttachedContext, Context, FloatingContext, SharedContext};
-pub use stream::{get_stream, with_stream, SharedStream, Stream};
+pub use global::{get_stream, with_stream};
+pub use stream::{SharedStream, Stream};
 
 pub struct Cuda;
 
@@ -68,44 +70,6 @@ impl Device for Cuda {
         }
     }
 }
-
-// pub struct CudaOwned {
-//     stream: Stream,
-// }
-
-// impl CudaOwned {
-//     pub fn new() -> CudaResult<Self> {
-//         let stream = Stream::new()?;
-
-//         Ok(CudaOwned { stream })
-//     }
-// }
-
-// impl Deref for CudaOwned {
-//     type Target = Cuda;
-
-//     fn deref(&self) -> &Cuda {
-//         Cuda::with_stream(&self.stream)
-//     }
-// }
-
-// pub struct Cuda {
-//     stream: SharedStream,
-// }
-
-// impl Cuda {
-//     pub fn with_stream(stream: &SharedStream) -> &Self {
-//         unsafe { &*(stream as *const SharedStream as *const Self) }
-//     }
-
-//     #[cfg(feature = "cublas")]
-//     pub fn init_cublas<'a>(
-//         &'a self,
-//         ctx: &'a crate::blas::cublas::CublasContext,
-//     ) -> &'a crate::blas::cublas::SharedCublasContext {
-//         ctx.with_stream(Some(&self.stream))
-//     }
-// }
 
 impl<'a> DeviceAllocator for &'a SharedStream {
     type AllocError = CudaError;
