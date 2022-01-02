@@ -1,30 +1,15 @@
 extern crate blas_src;
 extern crate blas_sys;
 
-use crate::device::cpu::Cpu;
+use crate::blas::{MatrixOp, GEMM};
 
-use super::{BLASContext, DefaultBLASContext, GEMM};
-
-#[derive(Clone, Copy, Default)]
-pub struct CpuContext;
-
-impl BLASContext for CpuContext {
-    type Device = Cpu;
-}
-
-impl DefaultBLASContext for Cpu {
-    type Context = CpuContext;
-
-    fn default_ctx() -> Self::Context {
-        CpuContext
-    }
-}
+use super::CpuContext;
 
 impl GEMM<CpuContext> for f32 {
     unsafe fn gemm(
         _ctx: CpuContext,
-        transa: super::MatrixOp,
-        transb: super::MatrixOp,
+        transa: MatrixOp,
+        transb: MatrixOp,
         m: i32,
         n: i32,
         k: i32,
@@ -58,8 +43,8 @@ impl GEMM<CpuContext> for f32 {
 impl GEMM<CpuContext> for f64 {
     unsafe fn gemm(
         _ctx: CpuContext,
-        transa: super::MatrixOp,
-        transb: super::MatrixOp,
+        transa: MatrixOp,
+        transb: MatrixOp,
         m: i32,
         n: i32,
         k: i32,

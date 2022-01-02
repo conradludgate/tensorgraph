@@ -111,7 +111,10 @@ impl<'a> DeviceAllocator for &'a SharedStream {
     type AllocError = CudaError;
     type Device = Cuda;
 
-    unsafe fn allocate(&self, layout: std::alloc::Layout) -> CudaResult<NonNull<[u8], Self::Device>> {
+    unsafe fn allocate(
+        &self,
+        layout: std::alloc::Layout,
+    ) -> CudaResult<NonNull<[u8], Self::Device>> {
         let size = layout.size();
         if size == 0 {
             return Err(CudaError::InvalidMemoryAllocation);

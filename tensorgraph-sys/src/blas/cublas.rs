@@ -2,13 +2,13 @@ use std::{ops::Deref, ptr::NonNull};
 
 use cust::memory::DevicePointer;
 use rcublas_sys::{
-    cublasContext, cublasCreate_v2, cublasDestroy_v2, cublasDgemm_v2, cublasSgemm_v2,
-    cublasStatus_t, cublasSetStream_v2, cublasHandle_t,
+    cublasContext, cublasCreate_v2, cublasDestroy_v2, cublasDgemm_v2, cublasHandle_t,
+    cublasSetStream_v2, cublasSgemm_v2, cublasStatus_t,
 };
 
 use crate::device::cuda::{Cuda, SharedStream};
 
-use super::{GEMM, BLASContext};
+use super::{BLASContext, GEMM};
 
 pub struct CublasContext {
     inner: NonNull<cublasContext>,

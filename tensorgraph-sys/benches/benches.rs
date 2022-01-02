@@ -4,7 +4,7 @@ use std::{alloc::Global, ops::Deref};
 
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use tensorgraph_sys::{
-    blas::{blas_sys::CpuContext, BLASContext, GEMM},
+    blas::{cpu::CpuContext, BLASContext, GEMM},
     device::DeviceAllocator,
     tensor::{gemm, Tensor},
     vec::Vec,

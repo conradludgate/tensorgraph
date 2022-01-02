@@ -1,7 +1,7 @@
 use std::alloc::Allocator;
 
 use crate::{
-    device::{cpu::Cpu, Device, DeviceAllocator, DefaultDeviceAllocator},
+    device::{cpu::Cpu, DefaultDeviceAllocator, Device, DeviceAllocator},
     ptr::slice::Slice,
     vec::Vec,
 };

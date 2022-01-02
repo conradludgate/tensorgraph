@@ -1,11 +1,6 @@
 use crate::device::Device;
 
-#[cfg(feature = "blas-sys")]
-#[allow(clippy::module_inception)]
-pub mod blas_sys;
-
-#[cfg(feature = "matrixmultiply")]
-pub mod matmul;
+pub mod cpu;
 
 #[cfg(feature = "cublas")]
 pub mod cublas;

@@ -1,11 +1,11 @@
 use std::{
-    alloc::{AllocError, Allocator, Layout, Global},
+    alloc::{AllocError, Allocator, Global, Layout},
     ops::{Deref, DerefMut},
 };
 
 use crate::ptr::slice::Slice;
 
-use super::{Device, DeviceAllocator, DevicePtr, NonNull, DefaultDeviceAllocator};
+use super::{DefaultDeviceAllocator, Device, DeviceAllocator, DevicePtr, NonNull};
 
 #[derive(Clone, Copy)]
 pub struct Cpu;
@@ -100,9 +100,7 @@ impl<A: Allocator> DeviceAllocator for A {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Cpu>, AllocError> {
-        Ok(self
-            .grow_zeroed(ptr.into(), old_layout, new_layout)?
-            .into())
+        Ok(self.grow_zeroed(ptr.into(), old_layout, new_layout)?.into())
     }
 
     unsafe fn shrink(
@@ -111,8 +109,6 @@ impl<A: Allocator> DeviceAllocator for A {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Cpu>, AllocError> {
-        Ok(self
-            .shrink(ptr.into(), old_layout, new_layout)?
-            .into())
+        Ok(self.shrink(ptr.into(), old_layout, new_layout)?.into())
     }
 }
