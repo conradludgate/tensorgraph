@@ -1,7 +1,6 @@
 use std::{
     alloc::{Allocator, Global},
     borrow::Borrow,
-    marker::PhantomData,
     mem::{ManuallyDrop, MaybeUninit},
     ops::{Deref, DerefMut},
 };
@@ -13,12 +12,11 @@ use crate::{
     zero::Zero,
 };
 
+/// Same as [`std::vec::Vec`] but using device allocators rather than host allocators.
+/// This allows you to have owned buffers on GPUs and CPUs using a single data structure.
 pub struct Vec<T, A: DeviceAllocator = Global> {
     buf: Box<[MaybeUninit<T>], A>,
     len: usize,
-
-    // marks that Vec owned the T values
-    _marker: PhantomData<T>,
 }
 
 impl<T, A: DeviceAllocator> Drop for Vec<T, A> {
@@ -101,11 +99,7 @@ impl<T, A: DeviceAllocator> Vec<T, A> {
     /// # Safety
     /// `buf` must be a valid allocation in `device`, and `len` items must be initialised
     pub unsafe fn from_raw_parts(buf: Box<[MaybeUninit<T>], A>, len: usize) -> Self {
-        Self {
-            buf,
-            len,
-            _marker: PhantomData,
-        }
+        Self { buf, len }
     }
 
     pub fn into_raw_parts(self) -> (Box<[MaybeUninit<T>], A>, usize) {

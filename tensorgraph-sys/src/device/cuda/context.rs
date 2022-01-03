@@ -5,10 +5,12 @@ use cust_raw::CUcontext;
 
 use crate::device::cuda::ToCudaResult;
 
+/// Represents an owned CUDA context
 pub struct Context {
     inner: NonNull<cust_raw::CUctx_st>,
 }
 
+/// Represents an attached CUDA context
 pub struct AttachedContext<'a> {
     inner: &'a SharedContext,
 }
@@ -95,6 +97,7 @@ impl Drop for Context {
     }
 }
 
+/// Represents a shared CUDA context
 pub struct SharedContext(cust_raw::CUctx_st);
 
 impl SharedContext {

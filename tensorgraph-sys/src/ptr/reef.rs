@@ -10,6 +10,9 @@ use crate::{
     vec::Vec,
 };
 
+/// A reference type for devices. Should have the same representation as `&T` but
+/// is not safely transmutable. Device references can not be read directly safely since
+/// the host is not guaranteed to be on that device.
 pub struct Ref<T: ?Sized, D: Device + ?Sized> {
     _device: PhantomData<D>,
     inner: T,

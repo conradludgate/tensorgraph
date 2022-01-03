@@ -31,7 +31,7 @@ name = "benches"
 harness = false
 
 [features]
-default = ["openblas", "cublas"]
+default = []
 
 cublas = ["tensorgraph-sys/cuda", "rcublas-sys"]
 

@@ -2,6 +2,7 @@ use std::{fmt::Debug, marker::PhantomData, ptr::Pointee};
 
 use crate::device::{Device, DevicePtr};
 
+/// Same as [`std::ptr::NonNull<T>`] but backed by a [`Device::Ptr`] instead of a raw pointer
 pub struct NonNull<T: ?Sized, D: Device + ?Sized> {
     inner: std::ptr::NonNull<T>,
     _marker: PhantomData<D>,

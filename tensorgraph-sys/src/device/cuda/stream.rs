@@ -5,11 +5,13 @@ use cust_raw::{CUstream, CUstream_st};
 
 use super::ToCudaResult;
 
+/// Represents an owned CUDA Stream.
 pub struct Stream {
     inner: NonNull<CUstream_st>,
 }
 
 impl Stream {
+    /// Create a new CUDA Stream
     pub fn new() -> CudaResult<Self> {
         let mut stream = std::ptr::null_mut();
 
@@ -39,6 +41,8 @@ impl Drop for Stream {
     }
 }
 
+/// A Shared CUDA Stream. Created through [`Deref`] from [`Stream`].
+/// Is a DeviceAllocator for Cuda
 pub struct SharedStream(CUstream_st);
 
 impl SharedStream {

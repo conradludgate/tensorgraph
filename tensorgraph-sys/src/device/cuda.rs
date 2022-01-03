@@ -17,6 +17,11 @@ pub use context::{AttachedContext, Context, FloatingContext, SharedContext};
 pub use global::{get_stream, with_stream};
 pub use stream::{SharedStream, Stream};
 
+#[derive(Debug)]
+/// Device for CUDA enabled GPUs
+///
+/// # Note
+/// Needs a [`Context`] to be created on the current thread to work
 pub struct Cuda;
 
 impl Device for Cuda {
@@ -72,7 +77,7 @@ impl<'a> DeviceAllocator for &'a SharedStream {
     type AllocError = CudaError;
     type Device = Cuda;
 
-    unsafe fn allocate(
+    fn allocate(
         &self,
         layout: std::alloc::Layout,
     ) -> CudaResult<NonNull<[u8], Self::Device>> {
@@ -82,19 +87,19 @@ impl<'a> DeviceAllocator for &'a SharedStream {
         }
 
         let mut ptr: *mut c_void = std::ptr::null_mut();
-        cust_raw::cuMemAllocAsync(&mut ptr as *mut *mut c_void as *mut u64, size, self.inner())
-            .to_cuda_result()?;
+        unsafe { cust_raw::cuMemAllocAsync(&mut ptr as *mut *mut c_void as *mut u64, size, self.inner())
+            .to_cuda_result()?; }
         let ptr = std::ptr::from_raw_parts_mut(ptr as *mut (), size);
         Ok(NonNull::new_unchecked(DevicePointer::wrap(ptr)))
     }
 
-    unsafe fn allocate_zeroed(
+    fn allocate_zeroed(
         &self,
         layout: std::alloc::Layout,
     ) -> CudaResult<NonNull<[u8], Self::Device>> {
         let size = layout.size();
         let ptr = self.allocate(layout)?;
-        cust_raw::cuMemsetD8Async(d_ptr(ptr), 0, size, self.inner()).to_cuda_result()?;
+        unsafe { cust_raw::cuMemsetD8Async(d_ptr(ptr), 0, size, self.inner()).to_cuda_result()?; }
         Ok(ptr)
     }
 

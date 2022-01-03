@@ -6,6 +6,7 @@ use tensorgraph_sys::{
     device::{DefaultDeviceAllocator, DeviceAllocator},
     ptr::reef::Ref,
     vec::Vec,
+    Share, ShareMut,
 };
 
 use crate::{
@@ -14,6 +15,7 @@ use crate::{
     storage::{IntoOwned, Storage, StorageMut},
 };
 
+/// A multidimensional data structure not unlike [`ndarray::ArrayBase`].
 pub struct Tensor<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> {
     shape: Dim,
     strides: Dim,
@@ -27,6 +29,40 @@ where
 {
     pub fn from_shape(shape: Dim, data: S) -> Self {
         Self::from_shape_in(S::Device::default_ctx(), shape, data)
+    }
+}
+
+impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Share for Tensor<S, C, Dim> {
+    type Ref<'a>
+    where
+        Self: 'a,
+    = TensorView<'a, S::T, S::Device, C, Dim>;
+
+    fn share(&self) -> TensorView<S::T, S::Device, C, Dim> {
+        Tensor {
+            shape: self.shape.clone(),
+            strides: self.strides.clone(),
+            data: self.data.as_ref(),
+            ctx: self.ctx.clone(),
+        }
+    }
+}
+
+impl<S: StorageMut, C: BLASContext<Device = S::Device>, Dim: Dimension> ShareMut
+    for Tensor<S, C, Dim>
+{
+    type Mut<'a>
+    where
+        Self: 'a,
+    = TensorViewMut<'a, S::T, S::Device, C, Dim>;
+
+    fn share_mut(&mut self) -> TensorViewMut<S::T, S::Device, C, Dim> {
+        Tensor {
+            shape: self.shape.clone(),
+            strides: self.strides.clone(),
+            data: self.data.as_mut(),
+            ctx: self.ctx.clone(),
+        }
     }
 }
 
@@ -56,29 +92,8 @@ impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Tensor<S, C
         self.strides.as_mut().swap(i, j);
     }
 
-    pub fn view(&self) -> TensorView<S::T, S::Device, C, Dim> {
-        Tensor {
-            shape: self.shape.clone(),
-            strides: self.strides.clone(),
-            data: self.data.as_ref(),
-            ctx: self.ctx.clone(),
-        }
-    }
-
-    pub fn view_mut(&mut self) -> TensorViewMut<S::T, S::Device, C, Dim>
-    where
-        S: StorageMut,
-    {
-        Tensor {
-            shape: self.shape.clone(),
-            strides: self.strides.clone(),
-            data: self.data.as_mut(),
-            ctx: self.ctx.clone(),
-        }
-    }
-
     pub fn t(&self) -> TensorView<S::T, S::Device, C, Dim> {
-        let mut view = self.view();
+        let mut view = self.share();
         view.reverse_axes();
         view
     }
@@ -116,10 +131,10 @@ impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Tensor<S, C
     }
 }
 
-type DefaultVec<T, D> = Vec<T, <D as DefaultDeviceAllocator>::Alloc>;
-type TensorView<'a, T, D, C, Dim> = Tensor<&'a Ref<[T], D>, C, Dim>;
-type TensorViewMut<'a, T, D, C, Dim> = Tensor<&'a mut Ref<[T], D>, C, Dim>;
-type UninitTensor<'a, T, D, C, Dim> = TensorViewMut<'a, MaybeUninit<T>, D, C, Dim>;
+pub type DefaultVec<T, D> = Vec<T, <D as DefaultDeviceAllocator>::Alloc>;
+pub type TensorView<'a, T, D, C, Dim> = Tensor<&'a Ref<[T], D>, C, Dim>;
+pub type TensorViewMut<'a, T, D, C, Dim> = Tensor<&'a mut Ref<[T], D>, C, Dim>;
+pub type UninitTensor<'a, T, D, C, Dim> = TensorViewMut<'a, MaybeUninit<T>, D, C, Dim>;
 
 impl<S: Storage, C: BLASContext<Device = S::Device>> Tensor<S, C, [usize; 2]> {
     pub fn dot(
@@ -153,7 +168,7 @@ impl<S: Storage, C: BLASContext<Device = S::Device>> Tensor<S, C, [usize; 2]> {
                 &mut v.space_capacity_mut()[..rows * cols],
             );
 
-            gemm_uninit(S::T::one(), self.view(), rhs, uninit);
+            gemm_uninit(S::T::one(), self.share(), rhs, uninit);
 
             v.set_len(rows * cols);
         }
@@ -259,7 +274,7 @@ fn lead(s: [usize; 2]) -> (MatrixOp, i32) {
 mod tests {
     use std::ops::Deref;
 
-    use tensorgraph_sys::vec::{vec_from_host, Vec};
+    use tensorgraph_sys::{vec::{vec_from_host, Vec}, Share, ShareMut};
 
     use crate::tensor::{gemm, Tensor};
 
@@ -423,7 +438,7 @@ mod tests {
         let mut c = Tensor::from_shape([2, 2], c);
 
         for _ in 0..1000 {
-            gemm(1., a.view(), b.view(), 0., c.view_mut());
+            gemm(1., a.share(), b.share(), 0., c.share_mut());
             std::mem::swap(&mut a, &mut c);
         }
 

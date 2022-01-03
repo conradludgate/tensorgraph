@@ -13,15 +13,18 @@ pub enum MatrixOp {
     // ConjTrans = b'C',
 }
 
+/// A context needed for running BLAS operations
 pub trait BLASContext: Clone {
     type Device: Device;
 }
 
+/// The default blas context for a device
 pub trait DefaultBLASContext: Device {
     type Context: BLASContext<Device = Self>;
     fn default_ctx() -> Self::Context;
 }
 
+/// A type that can be matrix multiplied
 pub trait GEMM<C: BLASContext>: Sized + Copy {
     #[allow(clippy::too_many_arguments)]
     /// # Safety

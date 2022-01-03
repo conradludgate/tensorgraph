@@ -1,4 +1,5 @@
 #[allow(clippy::len_without_is_empty)]
+/// A dimension type for a tensor
 pub trait Dimension: AsRef<[usize]> + AsMut<[usize]> + Clone {
     fn len(&self) -> usize {
         self.as_ref().iter().product()
@@ -18,13 +19,14 @@ pub trait Dimension: AsRef<[usize]> + AsMut<[usize]> + Clone {
     }
 }
 
+impl<const N: usize> Dimension for [usize; N] {}
+impl Dimension for std::vec::Vec<usize> {}
+
+/// Reduce an axis from a dimension
 pub trait RemoveDim: Dimension {
     type Smaller: Dimension;
     fn remove(&self, axis: usize) -> (Self::Smaller, usize);
 }
-
-impl<const N: usize> Dimension for [usize; N] {}
-impl Dimension for std::vec::Vec<usize> {}
 
 impl<const N: usize> RemoveDim for [usize; N]
 where
@@ -55,6 +57,8 @@ impl RemoveDim for std::vec::Vec<usize> {
     }
 }
 
+
+/// Insert an axis into a dimension
 pub trait InsertDim: Dimension {
     type Larger: Dimension;
     fn insert(&self, axis: usize, n: usize) -> Self::Larger;

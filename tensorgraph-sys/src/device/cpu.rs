@@ -1,3 +1,5 @@
+//! Cpu device and allocation
+
 use std::{
     alloc::{AllocError, Allocator, Global, Layout},
     ops::{Deref, DerefMut},
@@ -7,14 +9,9 @@ use crate::ptr::reef::Ref;
 
 use super::{DefaultDeviceAllocator, Device, DeviceAllocator, DevicePtr, NonNull};
 
-#[derive(Clone, Copy)]
+#[derive(Debug)]
+/// The default device
 pub struct Cpu;
-
-impl Default for Cpu {
-    fn default() -> Self {
-        Self
-    }
-}
 
 impl Device for Cpu {
     type Ptr<T: ?Sized> = *mut T;
@@ -73,12 +70,12 @@ impl<A: Allocator> DeviceAllocator for A {
     type AllocError = AllocError;
     type Device = Cpu;
 
-    unsafe fn allocate(&self, layout: Layout) -> Result<NonNull<[u8], Cpu>, AllocError> {
-        Ok(self.allocate(layout)?.into())
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8], Cpu>, AllocError> {
+        self.allocate(layout).map(NonNull::from)
     }
 
-    unsafe fn allocate_zeroed(&self, layout: Layout) -> Result<NonNull<[u8], Cpu>, AllocError> {
-        Ok(self.allocate_zeroed(layout)?.into())
+    fn allocate_zeroed(&self, layout: Layout) -> Result<NonNull<[u8], Cpu>, AllocError> {
+        self.allocate_zeroed(layout).map(NonNull::from)
     }
 
     unsafe fn deallocate(&self, ptr: NonNull<u8, Cpu>, layout: Layout) {
@@ -91,7 +88,7 @@ impl<A: Allocator> DeviceAllocator for A {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Cpu>, AllocError> {
-        Ok(self.grow(ptr.into(), old_layout, new_layout)?.into())
+        self.grow(ptr.into(), old_layout, new_layout).map(NonNull::from)
     }
 
     unsafe fn grow_zeroed(
@@ -100,7 +97,7 @@ impl<A: Allocator> DeviceAllocator for A {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Cpu>, AllocError> {
-        Ok(self.grow_zeroed(ptr.into(), old_layout, new_layout)?.into())
+        self.grow_zeroed(ptr.into(), old_layout, new_layout).map(NonNull::from)
     }
 
     unsafe fn shrink(
@@ -109,6 +106,6 @@ impl<A: Allocator> DeviceAllocator for A {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Cpu>, AllocError> {
-        Ok(self.shrink(ptr.into(), old_layout, new_layout)?.into())
+        self.shrink(ptr.into(), old_layout, new_layout).map(NonNull::from)
     }
 }

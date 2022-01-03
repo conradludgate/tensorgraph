@@ -11,6 +11,7 @@ use crate::{
     zero::Zero,
 };
 
+/// Similar to [`std::boxed::Box`] but on device.
 pub struct Box<T: ?Sized, A: DeviceAllocator = Global> {
     pub(crate) ptr: NonNull<T, A::Device>,
     alloc: A,

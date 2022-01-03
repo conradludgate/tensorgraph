@@ -2,6 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use tensorgraph_sys::{
     device::DefaultDeviceAllocator,
     vec::{vec_from_host, Vec},
+    Share, ShareMut,
 };
 
 use tensorgraph_math::{
@@ -27,7 +28,7 @@ where
     let mut c = Tensor::from_shape_in(ctx, [256, 256], c);
 
     for _ in 0..1000 {
-        gemm(1., a.view(), b.view(), 0., c.view_mut());
+        gemm(1., a.share(), b.share(), 0., c.share_mut());
         std::mem::swap(&mut a, &mut c);
     }
 

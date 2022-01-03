@@ -6,16 +6,19 @@ use tensorgraph_sys::{
     vec::Vec,
 };
 
+/// Convert a value into it's owned representation.
 pub trait IntoOwned {
     type Owned;
     fn into_owned(self) -> Self::Owned;
 }
 
+/// Represents a storage for [`crate::tensor::Tensor`]
 pub trait Storage: AsRef<Ref<[Self::T], Self::Device>> {
     type T;
     type Device: Device;
 }
 
+/// Represents a mutable storage for [`crate::tensor::Tensor`]
 pub trait StorageMut: Storage + AsMut<Ref<[Self::T], Self::Device>> {}
 
 // Vec

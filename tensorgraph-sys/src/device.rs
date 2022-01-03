@@ -3,11 +3,12 @@ use std::alloc::Layout;
 use crate::ptr::{non_null::NonNull, reef::Ref};
 
 pub mod cpu;
+
 #[cfg(feature = "cuda")]
 pub mod cuda;
 
-// pub mod global;
-
+/// Represents a physical device that can host memory.
+/// For example: [`cpu::Cpu`], [`cuda::Cuda`]
 pub trait Device {
     #![allow(clippy::missing_safety_doc)]
 
@@ -19,11 +20,15 @@ pub trait Device {
     fn copy<T: Copy>(from: &Ref<[T], Self>, to: &mut Ref<[T], Self>);
 }
 
+/// Defines the default allocator for a device.
+/// For instance, The default allocator for [`cpu::Cpu`] is [`std::alloc::Global`]
 pub trait DefaultDeviceAllocator: Device {
     type Alloc: DeviceAllocator<Device = Self>;
     fn default_alloc() -> Self::Alloc;
 }
 
+/// Represents a type safe device-based pointer.
+/// For the CPU, this will be just `*mut T`.
 pub trait DevicePtr<T: ?Sized>: Copy {
     fn as_raw(self) -> *mut T;
     fn from_raw(ptr: *mut T) -> Self;
@@ -69,34 +74,43 @@ pub trait DevicePtr<T: ?Sized>: Copy {
     }
 }
 
+/// An Allocator in a specific device.
+/// All [`std::alloc::Allocator`]s are [`DeviceAllocator<Device=cpu::Cpu>`]
 pub trait DeviceAllocator {
     #![allow(clippy::missing_safety_doc)]
 
+    /// Error returned when failing to allocate
     type AllocError: std::error::Error;
+
+    /// Device that the allocations will live in.
     type Device: Device;
 
-    // copied from the Allocator trait
-    unsafe fn allocate(
+    fn allocate(
         &self,
         layout: Layout,
     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
-    unsafe fn allocate_zeroed(
+
+    fn allocate_zeroed(
         &self,
         layout: Layout,
     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
+
     unsafe fn deallocate(&self, ptr: NonNull<u8, Self::Device>, layout: Layout);
+
     unsafe fn grow(
         &self,
         ptr: NonNull<u8, Self::Device>,
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
+
     unsafe fn grow_zeroed(
         &self,
         ptr: NonNull<u8, Self::Device>,
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
+
     unsafe fn shrink(
         &self,
         ptr: NonNull<u8, Self::Device>,
@@ -104,55 +118,3 @@ pub trait DeviceAllocator {
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
 }
-
-// // impl is conflicting :(
-// impl<'a, A: DeviceAllocator> DeviceAllocator for &'a A {
-//     type AllocError = A::AllocError;
-
-//     type Device = A::Device;
-
-//     unsafe fn allocate(
-//         &self,
-//         layout: Layout,
-//     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError> {
-//         A::allocate(self, layout)
-//     }
-
-//     unsafe fn allocate_zeroed(
-//         &self,
-//         layout: Layout,
-//     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError> {
-//         A::allocate_zeroed(self, layout)
-//     }
-
-//     unsafe fn deallocate(&self, ptr: NonNull<u8, Self::Device>, layout: Layout) {
-//         A::deallocate(self, ptr, layout)
-//     }
-
-//     unsafe fn grow(
-//         &self,
-//         ptr: NonNull<u8, Self::Device>,
-//         old_layout: Layout,
-//         new_layout: Layout,
-//     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError> {
-//         A::grow(self, ptr, old_layout, new_layout)
-//     }
-
-//     unsafe fn grow_zeroed(
-//         &self,
-//         ptr: NonNull<u8, Self::Device>,
-//         old_layout: Layout,
-//         new_layout: Layout,
-//     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError> {
-//         A::grow_zeroed(self, ptr, old_layout, new_layout)
-//     }
-
-//     unsafe fn shrink(
-//         &self,
-//         ptr: NonNull<u8, Self::Device>,
-//         old_layout: Layout,
-//         new_layout: Layout,
-//     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError> {
-//         A::shrink(self, ptr, old_layout, new_layout)
-//     }
-// }
