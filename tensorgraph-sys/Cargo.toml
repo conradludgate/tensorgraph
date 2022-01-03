@@ -1,6 +1,6 @@
 [package]
 name = "tensorgraph-sys"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 description = "backbone for tensorgraph, providing memory manamagement across devices"
 repository = "https://github.com/conradludgate/tensorgraph"
