@@ -16,46 +16,52 @@
 pub mod boxed;
 pub mod device;
 pub mod ptr;
-pub mod vec;
-pub mod zero;
+mod vec;
+mod zero;
 
-/// Represents a type that can be shared.
+pub use vec::{DefaultVec, Vec};
+pub use zero::Zero;
+
+/// Represents a type that can be 'viewed' (derefed).
 /// Mimics the impl for [`std::ops::Deref`] but makes use of `GAT`'s in order
 /// to provide non `&` refs. Useful for things like tensor views.
-pub trait Share {
+pub trait View {
     type Ref<'a>
     where
         Self: 'a;
 
-    fn share(&self) -> Self::Ref<'_>;
+    fn view(&self) -> Self::Ref<'_>;
 }
 
-pub trait ShareMut {
+/// Represents a type that can be mutably 'viewed' (derefed).
+/// Mimics the impl for [`std::ops::DerefMut`] but makes use of `GAT`'s in order
+/// to provide non `&mut` refs. Useful for things like tensor views.
+pub trait ViewMut {
     type Mut<'a>
     where
         Self: 'a;
 
-    fn share_mut(&mut self) -> Self::Mut<'_>;
+    fn view_mut(&mut self) -> Self::Mut<'_>;
 }
 
-impl<D: std::ops::Deref> Share for D {
+impl<D: std::ops::Deref> View for D {
     type Ref<'a>
     where
         Self: 'a,
     = &'a D::Target;
 
-    fn share(&self) -> Self::Ref<'_> {
+    fn view(&self) -> Self::Ref<'_> {
         self
     }
 }
 
-impl<D: std::ops::DerefMut> ShareMut for D {
+impl<D: std::ops::DerefMut> ViewMut for D {
     type Mut<'a>
     where
         Self: 'a,
     = &'a mut D::Target;
 
-    fn share_mut(&mut self) -> Self::Mut<'_> {
+    fn view_mut(&mut self) -> Self::Mut<'_> {
         self
     }
 }

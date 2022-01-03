@@ -2,8 +2,8 @@ use std::alloc::Allocator;
 
 use tensorgraph_sys::{
     device::{cpu::Cpu, DefaultDeviceAllocator, Device, DeviceAllocator},
-    ptr::reef::Ref,
-    vec::Vec,
+    ptr::Ref,
+    Vec,
 };
 
 /// Convert a value into it's owned representation.

@@ -5,9 +5,9 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::ptr::reef::Ref;
+use crate::ptr::{NonNull, Ref};
 
-use super::{DefaultDeviceAllocator, Device, DeviceAllocator, DevicePtr, NonNull};
+use super::{DefaultDeviceAllocator, Device, DeviceAllocator, DevicePtr};
 
 #[derive(Debug)]
 /// The default device

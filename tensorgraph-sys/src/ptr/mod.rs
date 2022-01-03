@@ -1,2 +1,5 @@
-pub mod non_null;
-pub mod reef;
+mod non_null;
+mod reef;
+
+pub use non_null::NonNull;
+pub use reef::Ref;

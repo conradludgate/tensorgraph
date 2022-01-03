@@ -1,6 +1,6 @@
 use std::alloc::Layout;
 
-use crate::ptr::{non_null::NonNull, reef::Ref};
+use crate::ptr::{NonNull, Ref};
 
 pub mod cpu;
 

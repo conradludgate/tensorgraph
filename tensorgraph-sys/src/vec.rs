@@ -8,7 +8,7 @@ use std::{
 use crate::{
     boxed::Box,
     device::{cpu::Cpu, DefaultDeviceAllocator, Device, DeviceAllocator, DevicePtr},
-    ptr::{non_null::NonNull, reef::Ref},
+    ptr::{NonNull, Ref},
     zero::Zero,
 };
 
@@ -19,6 +19,7 @@ pub struct Vec<T, A: DeviceAllocator<D> = Global, D: Device = Cpu> {
     len: usize,
 }
 
+/// A [`Vec`] that uses the default allocator for the device
 pub type DefaultVec<T, D = Cpu> = Vec<T, <D as DefaultDeviceAllocator>::Alloc, D>;
 
 impl<T, A: DeviceAllocator<D>, D: Device> Drop for Vec<T, A, D> {

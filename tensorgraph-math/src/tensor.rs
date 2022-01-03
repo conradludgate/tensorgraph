@@ -4,9 +4,8 @@ use num_traits::{One, Zero};
 
 use tensorgraph_sys::{
     device::{DefaultDeviceAllocator, Device, DeviceAllocator},
-    ptr::reef::Ref,
-    vec::{DefaultVec, Vec},
-    Share, ShareMut,
+    ptr::Ref,
+    View, ViewMut, {DefaultVec, Vec},
 };
 
 use crate::{
@@ -22,13 +21,13 @@ pub struct Tensor<S: Storage, Dim: Dimension> {
     data: S,
 }
 
-impl<S: Storage, Dim: Dimension> Share for Tensor<S, Dim> {
+impl<S: Storage, Dim: Dimension> View for Tensor<S, Dim> {
     type Ref<'a>
     where
         Self: 'a,
     = TensorView<'a, S::T, S::Device, Dim>;
 
-    fn share(&self) -> TensorView<S::T, S::Device, Dim> {
+    fn view(&self) -> TensorView<S::T, S::Device, Dim> {
         Tensor {
             shape: self.shape.clone(),
             strides: self.strides.clone(),
@@ -37,13 +36,13 @@ impl<S: Storage, Dim: Dimension> Share for Tensor<S, Dim> {
     }
 }
 
-impl<S: StorageMut, Dim: Dimension> ShareMut for Tensor<S, Dim> {
+impl<S: StorageMut, Dim: Dimension> ViewMut for Tensor<S, Dim> {
     type Mut<'a>
     where
         Self: 'a,
     = TensorViewMut<'a, S::T, S::Device, Dim>;
 
-    fn share_mut(&mut self) -> TensorViewMut<S::T, S::Device, Dim> {
+    fn view_mut(&mut self) -> TensorViewMut<S::T, S::Device, Dim> {
         Tensor {
             shape: self.shape.clone(),
             strides: self.strides.clone(),
@@ -84,7 +83,7 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
     /// Returns a view of the tensor with the contents transposed.
     /// This operation happens without mutating or cloning any data
     pub fn t(&self) -> Tensor<&ViewOf<S>, Dim> {
-        let mut view = self.share();
+        let mut view = self.view();
         view.reverse_axes();
         view
     }
@@ -104,7 +103,7 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
     }
 
     /// Slices the tensor over a specific axis. The resulting tensor will be a dimension smaller
-    pub fn slice_axis(&self, axis: usize, n: usize) -> TensorView<S::T, S::Device, Dim::Smaller>
+    pub fn slice_axis(&self, axis: usize, n: usize) -> Tensor<&ViewOf<S>, Dim::Smaller>
     where
         Dim: RemoveDim,
     {
@@ -196,7 +195,7 @@ impl<S: Storage> Matrix<S> {
             let uninit =
                 Matrix::from_shape([rows, cols], &mut v.space_capacity_mut()[..rows * cols]);
 
-            gemm_uninit_ctx(ctx, S::T::one(), self.share(), rhs, uninit);
+            gemm_uninit_ctx(ctx, S::T::one(), self.view(), rhs, uninit);
 
             v.set_len(rows * cols);
         }
@@ -331,7 +330,7 @@ fn lead(s: [usize; 2]) -> (MatrixOp, i32) {
 mod tests {
     use std::ops::Deref;
 
-    use tensorgraph_sys::{vec::Vec, Share, ShareMut};
+    use tensorgraph_sys::{View, ViewMut, Vec};
 
     use crate::tensor::{gemm, Tensor};
 
@@ -458,7 +457,7 @@ mod tests {
         use crate::blas::cublas::CublasContext;
         use tensorgraph_sys::{
             device::cuda::{Context, Cuda, Stream},
-            vec::DefaultVec,
+            DefaultVec,
         };
 
         let ctx = Context::quick_init().unwrap();
@@ -495,7 +494,7 @@ mod tests {
         let mut c = Tensor::from_shape([2, 2], c);
 
         for _ in 0..1000 {
-            gemm(1., a.share(), b.share(), 0., c.share_mut());
+            gemm(1., a.view(), b.view(), 0., c.view_mut());
             std::mem::swap(&mut a, &mut c);
         }
 

@@ -1,8 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use tensorgraph_sys::{
     device::{cpu::Cpu, DefaultDeviceAllocator},
-    vec::DefaultVec,
-    Share, ShareMut,
+    DefaultVec, View, ViewMut,
 };
 
 use tensorgraph_math::{
@@ -29,7 +28,7 @@ where
 
     let ctx = D::Context::default();
     for _ in 0..1000 {
-        gemm_ctx(ctx, 1., a.share(), b.share(), 0., c.share_mut());
+        gemm_ctx(ctx, 1., a.view(), b.view(), 0., c.view_mut());
         std::mem::swap(&mut a, &mut c);
     }
 

@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     device::{cpu::Cpu, Device, DeviceAllocator, DevicePtr},
-    ptr::{non_null::NonNull, reef::Ref},
+    ptr::{NonNull, Ref},
     zero::Zero,
 };
 
