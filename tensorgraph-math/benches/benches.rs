@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use tensorgraph_sys::{
-    device::{cpu::Cpu, cuda::Cuda, DefaultDeviceAllocator},
-    vec::{vec_from_host, Vec},
+    device::{cpu::Cpu, DefaultDeviceAllocator},
+    vec::DefaultVec,
     Share, ShareMut,
 };
 
@@ -13,13 +13,13 @@ use tensorgraph_math::{
 /// Performs 1000 matrix mulitplications on a 256x256 matrix
 pub fn matmul_1000_256<D: DefaultDeviceAllocator + DefaultBLASContext>(
     init: &[f64],
-) -> Vec<f64, D::Alloc>
+) -> DefaultVec<f64, D>
 where
-    f64: GEMM<D::Context>,
+    f64: GEMM<D::Context, D>,
     D::Alloc: Clone,
     D::Context: Copy,
 {
-    let a = vec_from_host::<f64, D>(init);
+    let a = DefaultVec::<f64, D>::copy_from_host(init);
     let b = a.clone();
     let c = b.clone();
 
@@ -68,7 +68,7 @@ pub fn matmul(c: &mut Criterion) {
     #[cfg(feature = "cublas")]
     {
         use tensorgraph_math::blas::cublas::CublasContext;
-        use tensorgraph_sys::device::cuda::{Context, Stream};
+        use tensorgraph_sys::device::cuda::{Context, Cuda, CudaUnified, Stream};
 
         let cuda_ctx = Context::quick_init().unwrap();
         let stream = Stream::new(&cuda_ctx).unwrap();
@@ -81,6 +81,36 @@ pub fn matmul(c: &mut Criterion) {
                 // includes the time to sync data in the benchmark
                 let mut out = vec![0.0f64; 256 * 256];
                 matmul_1000_256::<Cuda>(&init).copy_to_host(&mut out);
+
+                black_box(out)
+            });
+        });
+
+        group.bench_function("cublas_unified", |b| {
+            b.iter(|| {
+                // includes the time to sync data in the benchmark
+                let mut out = vec![0.0f64; 256 * 256];
+                matmul_1000_256::<CudaUnified>(&init).copy_to_host(&mut out);
+
+                black_box(out)
+            });
+        });
+    }
+
+    #[cfg(feature = "cublas")]
+    {
+        use tensorgraph_math::blas::cublas::CublasContext;
+        use tensorgraph_sys::device::cuda::{Context, CudaUnified};
+
+        let _cuda_ctx = Context::quick_init().unwrap();
+        let cublas_ctx = CublasContext::new();
+        let _handle = cublas_ctx.with_stream(None).as_global();
+
+        group.bench_function("cublas_unified_sync", |b| {
+            b.iter(|| {
+                // includes the time to sync data in the benchmark
+                let mut out = vec![0.0f64; 256 * 256];
+                matmul_1000_256::<CudaUnified>(&init).copy_to_host(&mut out);
 
                 black_box(out)
             });

@@ -5,7 +5,7 @@ use num_traits::{One, Zero};
 use tensorgraph_sys::{
     device::{DefaultDeviceAllocator, Device, DeviceAllocator},
     ptr::reef::Ref,
-    vec::Vec,
+    vec::{DefaultVec, Vec},
     Share, ShareMut,
 };
 
@@ -114,7 +114,6 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
     }
 }
 
-pub type DefaultVec<T, D> = Vec<T, <D as DefaultDeviceAllocator>::Alloc>;
 pub type TensorView<'a, T, D, Dim> = Tensor<&'a Ref<[T], D>, Dim>;
 pub type TensorViewMut<'a, T, D, Dim> = Tensor<&'a mut Ref<[T], D>, Dim>;
 pub type UninitTensor<'a, T, D, Dim> = TensorViewMut<'a, MaybeUninit<T>, D, Dim>;
@@ -132,12 +131,12 @@ impl<S: Storage> Matrix<S> {
     where
         S::T: Zero + One,
         S::Device: DefaultDeviceAllocator + DefaultBLASContext,
-        S::T: GEMM<<S::Device as DefaultBLASContext>::Context>,
+        S::T: GEMM<<S::Device as DefaultBLASContext>::Context, S::Device>,
     {
         self.dot_using(rhs, Default::default())
     }
 
-    pub fn dot_using<C: BLASContext<Device = S::Device>>(
+    pub fn dot_using<C: BLASContext<S::Device>>(
         &self,
         rhs: Matrix<impl Storage<T = S::T, Device = S::Device>>,
         ctx: C,
@@ -145,20 +144,20 @@ impl<S: Storage> Matrix<S> {
     where
         S::T: Zero + One,
         S::Device: DefaultDeviceAllocator,
-        S::T: GEMM<C>,
+        S::T: GEMM<C, S::Device>,
     {
         self.dot_into(rhs, ctx, Default::default())
     }
 
-    pub fn dot_into<C: BLASContext<Device = S::Device>, A: DeviceAllocator<Device = S::Device>>(
+    pub fn dot_into<C: BLASContext<S::Device>, A: DeviceAllocator<S::Device>>(
         &self,
         rhs: Matrix<impl Storage<T = S::T, Device = S::Device>>,
         ctx: C,
         alloc: A,
-    ) -> Matrix<Vec<S::T, A>>
+    ) -> Matrix<Vec<S::T, A, S::Device>>
     where
         S::T: Zero + One,
-        S::T: GEMM<C>,
+        S::T: GEMM<C, S::Device>,
     {
         let rows = self.shape[0];
         let cols = rhs.shape[1];
@@ -199,7 +198,7 @@ impl<'a, T: Copy, D: Device, Dim: Dimension> TensorView<'a, MaybeUninit<T>, D, D
     }
 }
 
-pub fn gemm_uninit<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
+pub fn gemm_uninit<F: GEMM<D::Context, D> + Zero, D: DefaultBLASContext>(
     alpha: F,
     a: Matrix<impl Storage<T = F, Device = D>>,
     b: Matrix<impl Storage<T = F, Device = D>>,
@@ -208,19 +207,19 @@ pub fn gemm_uninit<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
     gemm_uninit_ctx(D::Context::default(), alpha, a, b, c)
 }
 
-pub fn gemm_uninit_ctx<F: GEMM<C> + Zero, C: BLASContext>(
+pub fn gemm_uninit_ctx<F: GEMM<C, D> + Zero, C: BLASContext<D>, D: Device>(
     ctx: C,
     alpha: F,
-    a: Matrix<impl Storage<T = F, Device = C::Device>>,
-    b: Matrix<impl Storage<T = F, Device = C::Device>>,
-    c: UninitMatrix<F, C::Device>,
+    a: Matrix<impl Storage<T = F, Device = D>>,
+    b: Matrix<impl Storage<T = F, Device = D>>,
+    c: UninitMatrix<F, D>,
 ) {
     // Safety:
     // Specifying beta == 0.0 should allow c to be safely read while uninitialised
     unsafe { gemm_ctx(ctx, alpha, a, b, F::zero(), c.assume_init()) }
 }
 
-pub fn gemm<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
+pub fn gemm<F: GEMM<D::Context, D> + Zero, D: DefaultBLASContext>(
     alpha: F,
     a: Matrix<impl Storage<T = F, Device = D>>,
     b: Matrix<impl Storage<T = F, Device = D>>,
@@ -230,13 +229,13 @@ pub fn gemm<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
     gemm_ctx(D::Context::default(), alpha, a, b, beta, c)
 }
 
-pub fn gemm_ctx<F: GEMM<C> + Zero, C: BLASContext>(
+pub fn gemm_ctx<F: GEMM<C, D> + Zero, C: BLASContext<D>, D: Device>(
     ctx: C,
     alpha: F,
-    a: Matrix<impl Storage<T = F, Device = C::Device>>,
-    b: Matrix<impl Storage<T = F, Device = C::Device>>,
+    a: Matrix<impl Storage<T = F, Device = D>>,
+    b: Matrix<impl Storage<T = F, Device = D>>,
     beta: F,
-    c: MatrixViewMut<F, C::Device>,
+    c: MatrixViewMut<F, D>,
 ) {
     let [rowsa, colsa] = a.shape;
     let [rowsb, colsb] = b.shape;
@@ -290,10 +289,7 @@ fn lead(s: [usize; 2]) -> (MatrixOp, i32) {
 mod tests {
     use std::ops::Deref;
 
-    use tensorgraph_sys::{
-        vec::{vec_from_host, Vec},
-        Share, ShareMut,
-    };
+    use tensorgraph_sys::{vec::Vec, Share, ShareMut};
 
     use crate::tensor::{gemm, Tensor};
 
@@ -418,15 +414,18 @@ mod tests {
     #[cfg(feature = "cublas")]
     fn matmul_cuda_global() {
         use crate::blas::cublas::CublasContext;
-        use tensorgraph_sys::device::cuda::{Context, Cuda, Stream};
+        use tensorgraph_sys::{
+            device::cuda::{Context, Cuda, Stream},
+            vec::DefaultVec,
+        };
 
         let ctx = Context::quick_init().unwrap();
         let cuda = Stream::new(&ctx).unwrap();
         let _handle = cuda.as_global();
 
         // column major
-        let a = vec_from_host::<f32, Cuda>(&[0., 2., 4., 1., 3., 5.]);
-        let b = vec_from_host::<f32, Cuda>(&[0., 2., 1., 3.]);
+        let a = DefaultVec::<f32, Cuda>::copy_from_host(&[0., 2., 4., 1., 3., 5.]);
+        let b = DefaultVec::<f32, Cuda>::copy_from_host(&[0., 2., 1., 3.]);
 
         let ctx = CublasContext::new();
         let _handle = ctx.with_stream(Some(&cuda)).as_global();

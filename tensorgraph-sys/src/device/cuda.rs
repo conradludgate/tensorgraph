@@ -12,10 +12,12 @@ use super::{Device, DeviceAllocator, DevicePtr};
 mod context;
 mod global;
 mod stream;
-// pub mod global;
+mod unified;
+
 pub use context::{AttachedContext, Context, FloatingContext, SharedContext};
 pub use global::get_stream;
 pub use stream::{SharedStream, Stream};
+pub use unified::{CudaUnified, UnifiedAlloc};
 
 #[derive(Debug)]
 /// Device for CUDA enabled GPUs
@@ -73,11 +75,10 @@ impl Device for Cuda {
     }
 }
 
-impl<'a> DeviceAllocator for &'a SharedStream {
+impl<'a> DeviceAllocator<Cuda> for &'a SharedStream {
     type AllocError = CudaError;
-    type Device = Cuda;
 
-    fn allocate(&self, layout: std::alloc::Layout) -> CudaResult<NonNull<[u8], Self::Device>> {
+    fn allocate(&self, layout: std::alloc::Layout) -> CudaResult<NonNull<[u8], Cuda>> {
         let size = layout.size();
         if size == 0 {
             return Err(CudaError::InvalidMemoryAllocation);
@@ -92,10 +93,7 @@ impl<'a> DeviceAllocator for &'a SharedStream {
         unsafe { Ok(NonNull::new_unchecked(DevicePointer::wrap(ptr))) }
     }
 
-    fn allocate_zeroed(
-        &self,
-        layout: std::alloc::Layout,
-    ) -> CudaResult<NonNull<[u8], Self::Device>> {
+    fn allocate_zeroed(&self, layout: std::alloc::Layout) -> CudaResult<NonNull<[u8], Cuda>> {
         let size = layout.size();
         let ptr = self.allocate(layout)?;
         unsafe {
@@ -104,7 +102,7 @@ impl<'a> DeviceAllocator for &'a SharedStream {
         Ok(ptr)
     }
 
-    unsafe fn deallocate(&self, ptr: NonNull<u8, Self::Device>, _layout: std::alloc::Layout) {
+    unsafe fn deallocate(&self, ptr: NonNull<u8, Cuda>, _layout: std::alloc::Layout) {
         cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner())
             .to_cuda_result()
             .unwrap();
@@ -112,10 +110,10 @@ impl<'a> DeviceAllocator for &'a SharedStream {
 
     unsafe fn grow(
         &self,
-        ptr: NonNull<u8, Self::Device>,
+        ptr: NonNull<u8, Cuda>,
         old_layout: std::alloc::Layout,
         new_layout: std::alloc::Layout,
-    ) -> CudaResult<NonNull<[u8], Self::Device>> {
+    ) -> CudaResult<NonNull<[u8], Cuda>> {
         let new = self.allocate(new_layout)?;
 
         let size = old_layout.size();
@@ -127,10 +125,10 @@ impl<'a> DeviceAllocator for &'a SharedStream {
 
     unsafe fn grow_zeroed(
         &self,
-        ptr: NonNull<u8, Self::Device>,
+        ptr: NonNull<u8, Cuda>,
         old_layout: std::alloc::Layout,
         new_layout: std::alloc::Layout,
-    ) -> CudaResult<NonNull<[u8], Self::Device>> {
+    ) -> CudaResult<NonNull<[u8], Cuda>> {
         let new = self.allocate_zeroed(new_layout)?;
 
         let size = old_layout.size();
@@ -142,10 +140,10 @@ impl<'a> DeviceAllocator for &'a SharedStream {
 
     unsafe fn shrink(
         &self,
-        ptr: NonNull<u8, Self::Device>,
+        ptr: NonNull<u8, Cuda>,
         _old_layout: std::alloc::Layout,
         new_layout: std::alloc::Layout,
-    ) -> CudaResult<NonNull<[u8], Self::Device>> {
+    ) -> CudaResult<NonNull<[u8], Cuda>> {
         let size = new_layout.size();
         let new = self.allocate(new_layout)?;
 

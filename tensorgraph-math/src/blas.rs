@@ -14,17 +14,15 @@ pub enum MatrixOp {
 }
 
 /// A context needed for running BLAS operations
-pub trait BLASContext: Clone {
-    type Device: Device;
-}
+pub trait BLASContext<D: Device + ?Sized>: Clone {}
 
 /// The default blas context for a device
 pub trait DefaultBLASContext: Device {
-    type Context: BLASContext<Device = Self> + Default;
+    type Context: BLASContext<Self> + Default;
 }
 
 /// A type that can be matrix multiplied
-pub trait GEMM<C: BLASContext>: Sized + Copy {
+pub trait GEMM<C: BLASContext<D>, D: Device>: Sized + Copy {
     #[allow(clippy::too_many_arguments)]
     /// # Safety
     /// This is often a call across an FFI barrier, so the links or devices need to be
@@ -37,12 +35,12 @@ pub trait GEMM<C: BLASContext>: Sized + Copy {
         n: i32,
         k: i32,
         alpha: Self,
-        a: <C::Device as Device>::Ptr<Self>,
+        a: D::Ptr<Self>,
         lda: i32,
-        b: <C::Device as Device>::Ptr<Self>,
+        b: D::Ptr<Self>,
         ldb: i32,
         beta: Self,
-        c: <C::Device as Device>::Ptr<Self>,
+        c: D::Ptr<Self>,
         ldc: i32,
     );
 }
