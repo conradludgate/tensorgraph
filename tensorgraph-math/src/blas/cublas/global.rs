@@ -1,4 +1,4 @@
-use std::{cell::RefCell, lazy::Lazy, ops::Deref};
+use std::{cell::RefCell, lazy::Lazy};
 
 use rcublas_sys::cublasContext;
 use tensorgraph_sys::device::cuda::Cuda;
@@ -12,23 +12,23 @@ static GLOBAL: Lazy<RefCell<Option<std::ptr::NonNull<cublasContext>>>> =
     Lazy::new(|| RefCell::new(None));
 
 impl SharedCublasContext {
-    /// Runs the given closure with the cublas context as the global thread-local context
-    pub fn global_over<R, F: FnOnce(&Self) -> R>(&self, f: F) -> R {
-        let pointer = GLOBAL.deref();
-
-        let old = pointer.replace(Some(unsafe {
+    /// Sets the cublas context as the global thread-local context
+    pub fn as_global(&self) -> CublasContextHandle {
+        CublasContextHandle(GLOBAL.replace(Some(unsafe {
             std::ptr::NonNull::new_unchecked(self.handle())
-        }));
-
-        let out = f(self);
-
-        let _ctx = pointer.replace(old);
-
-        out
+        })))
     }
 }
 
-/// Get the global stream set via [`with_stream`]
+pub struct CublasContextHandle(Option<std::ptr::NonNull<cublasContext>>);
+
+impl Drop for CublasContextHandle {
+    fn drop(&mut self) {
+        let _ctx = GLOBAL.replace(self.0);
+    }
+}
+
+/// Get the global stream set via [`SharedCublasContext::as_global`]
 pub fn get_cublas() -> Option<&'static SharedCublasContext> {
     GLOBAL
         .borrow()

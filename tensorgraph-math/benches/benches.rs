@@ -70,20 +70,20 @@ pub fn matmul(c: &mut Criterion) {
         use tensorgraph_math::blas::cublas::CublasContext;
         use tensorgraph_sys::device::cuda::{Context, Stream};
 
-        let ctx = Context::quick_init().unwrap();
-        Stream::new(&ctx).unwrap().global_over(|cuda| {
-            let ctx = CublasContext::new();
-            ctx.with_stream(Some(cuda)).global_over(|_ctx| {
-                group.bench_function("cublas", |b| {
-                    b.iter(|| {
-                        // includes the time to sync data in the benchmark
-                        let mut out = vec![0.0f64; 256 * 256];
-                        matmul_1000_256::<Cuda>(&init).copy_to_host(&mut out);
+        let cuda_ctx = Context::quick_init().unwrap();
+        let stream = Stream::new(&cuda_ctx).unwrap();
+        let _handle = stream.as_global();
+        let cublas_ctx = CublasContext::new();
+        let _handle = cublas_ctx.with_stream(Some(&stream)).as_global();
 
-                        black_box(out)
-                    });
-                });
-            })
+        group.bench_function("cublas", |b| {
+            b.iter(|| {
+                // includes the time to sync data in the benchmark
+                let mut out = vec![0.0f64; 256 * 256];
+                matmul_1000_256::<Cuda>(&init).copy_to_host(&mut out);
+
+                black_box(out)
+            });
         });
     }
 

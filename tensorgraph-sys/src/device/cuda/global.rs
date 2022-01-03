@@ -1,4 +1,4 @@
-use std::{cell::RefCell, lazy::Lazy, ops::Deref};
+use std::{cell::RefCell, lazy::Lazy};
 
 use cust_raw::CUstream_st;
 
@@ -11,23 +11,23 @@ static GLOBAL: Lazy<RefCell<Option<std::ptr::NonNull<CUstream_st>>>> =
     Lazy::new(|| RefCell::new(None));
 
 impl SharedStream {
-    /// Runs the given closure with the stream as the global thread-local stream
-    pub fn global_over<R, F: FnOnce(&Self) -> R>(&self, f: F) -> R {
-        let pointer = GLOBAL.deref();
-
-        let old = pointer.replace(Some(unsafe {
+    /// Sets the stream as the global thread-local stream
+    pub fn as_global(&self) -> StreamHandle {
+        StreamHandle(GLOBAL.replace(Some(unsafe {
             std::ptr::NonNull::new_unchecked(self.inner())
-        }));
-
-        let out = f(self);
-
-        let _stream = pointer.replace(old);
-
-        out
+        })))
     }
 }
 
-/// Get the global stream set via [`with_stream`]
+pub struct StreamHandle(Option<std::ptr::NonNull<CUstream_st>>);
+
+impl Drop for StreamHandle {
+    fn drop(&mut self) {
+        let _ctx = GLOBAL.replace(self.0);
+    }
+}
+
+/// Get the global stream set via [`SharedStream::as_global`]
 pub fn get_stream() -> Option<&'static SharedStream> {
     GLOBAL
         .borrow()

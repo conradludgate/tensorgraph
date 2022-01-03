@@ -15,7 +15,7 @@ use crate::{
     storage::{IntoOwned, Storage, StorageMut},
 };
 
-/// A multidimensional data structure not unlike [`ndarray::ArrayBase`].
+/// A multidimensional data structure not unlike [`ndarray::ArrayBase`](https://docs.rs/ndarray/0.15.4/ndarray/struct.ArrayBase.html).
 pub struct Tensor<S: Storage, Dim: Dimension> {
     shape: Dim,
     strides: Dim,
@@ -422,25 +422,22 @@ mod tests {
 
         let ctx = Context::quick_init().unwrap();
         let cuda = Stream::new(&ctx).unwrap();
+        let _handle = cuda.as_global();
 
-        let out = cuda.global_over(|cuda| {
-            // column major
-            let a = vec_from_host::<f32, Cuda>(&[0., 2., 4., 1., 3., 5.]);
-            let b = vec_from_host::<f32, Cuda>(&[0., 2., 1., 3.]);
+        // column major
+        let a = vec_from_host::<f32, Cuda>(&[0., 2., 4., 1., 3., 5.]);
+        let b = vec_from_host::<f32, Cuda>(&[0., 2., 1., 3.]);
 
-            let ctx = CublasContext::new();
-            ctx.with_stream(Some(cuda)).global_over(|_ctx| {
-                let a = Tensor::from_shape([3, 2], a);
-                let b = Tensor::from_shape([2, 2], b);
+        let ctx = CublasContext::new();
+        let _handle = ctx.with_stream(Some(&cuda)).as_global();
 
-                let c = a.dot(b);
+        let a = Tensor::from_shape([3, 2], a);
+        let b = Tensor::from_shape([2, 2], b);
 
-                let mut out = vec![0.0_f32; 6];
-                c.data.copy_to_host(&mut out);
+        let c = a.dot(b);
 
-                out
-            })
-        });
+        let mut out = vec![0.0_f32; 6];
+        c.data.copy_to_host(&mut out);
 
         assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
     }
