@@ -1,4 +1,4 @@
-use crate::device::cpu::Cpu;
+use tensorgraph_sys::device::cpu::Cpu;
 
 use super::{BLASContext, DefaultBLASContext};
 

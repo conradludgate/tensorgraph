@@ -10,9 +10,10 @@
     generic_const_exprs,
     thread_local,
     once_cell,
-    layout_for_ptr,
+    layout_for_ptr
 )]
 
+pub mod blas;
 pub mod dims;
 pub mod storage;
 pub mod tensor;

@@ -18,7 +18,6 @@ pub mod ptr;
 pub mod vec;
 pub mod zero;
 pub mod boxed;
-pub mod blas;
 
 pub trait Share {
     type Ref<'a>

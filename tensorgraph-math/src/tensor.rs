@@ -3,13 +3,13 @@ use std::mem::MaybeUninit;
 use num_traits::{One, Zero};
 
 use tensorgraph_sys::{
-    blas::{BLASContext, DefaultBLASContext, MatrixOp, GEMM},
     device::{DefaultDeviceAllocator, DeviceAllocator},
     ptr::reef::Ref,
     vec::Vec,
 };
 
 use crate::{
+    blas::{BLASContext, DefaultBLASContext, MatrixOp, GEMM},
     dims::{Dimension, RemoveDim},
     storage::{IntoOwned, Storage, StorageMut},
 };
@@ -355,7 +355,7 @@ mod tests {
     #[test]
     #[cfg(feature = "cublas")]
     fn matmul_cuda() {
-        use tensorgraph_sys::blas::cublas::CublasContext;
+        use crate::blas::cublas::CublasContext;
         use tensorgraph_sys::device::cuda::{Context, Stream};
 
         let _ctx = Context::quick_init().unwrap();
@@ -367,7 +367,7 @@ mod tests {
         let b = Vec::copy_from_host_in(&[0., 2., 1., 3.], cuda);
 
         let ctx = CublasContext::new();
-        let ctx = cuda.init_cublas(&ctx);
+        let ctx = ctx.with_stream(Some(cuda));
 
         let a = Tensor::from_shape_in(ctx, [3, 2], a);
         let b = Tensor::from_shape_in(ctx, [2, 2], b);
@@ -383,19 +383,19 @@ mod tests {
     #[test]
     #[cfg(feature = "cublas")]
     fn matmul_cuda_global() {
-        use tensorgraph_sys::blas::cublas::CublasContext;
+        use crate::blas::cublas::CublasContext;
         use tensorgraph_sys::device::cuda::{with_stream, Context, Cuda, Stream};
 
         let _ctx = Context::quick_init().unwrap();
         let cuda = Stream::new().unwrap();
 
-        let out = with_stream(&cuda, |_cuda| {
+        let out = with_stream(&cuda, |cuda| {
             // column major
             let a = vec_from_host::<f32, Cuda>(&[0., 2., 4., 1., 3., 5.]);
             let b = vec_from_host::<f32, Cuda>(&[0., 2., 1., 3.]);
 
             let ctx = CublasContext::new();
-            let ctx = cuda.init_cublas(&ctx);
+            let ctx = ctx.with_stream(Some(cuda));
 
             let a = Tensor::from_shape_in(ctx, [3, 2], a);
             let b = Tensor::from_shape_in(ctx, [2, 2], b);
@@ -444,7 +444,7 @@ mod tests {
     #[test]
     #[cfg(feature = "cublas")]
     fn matmul_cuda2() {
-        use tensorgraph_sys::blas::cublas::CublasContext;
+        use crate::blas::cublas::CublasContext;
         use tensorgraph_sys::device::cuda::{Context, Stream};
 
         let _ctx = Context::quick_init().unwrap();
@@ -457,7 +457,7 @@ mod tests {
         let c = b.clone();
 
         let ctx = CublasContext::new();
-        let ctx = cuda.init_cublas(&ctx);
+        let ctx = ctx.with_stream(Some(cuda));
 
         let mut a = Tensor::from_shape_in(ctx, [2, 2], a);
         let b = Tensor::from_shape_in(ctx, [2, 2], b);

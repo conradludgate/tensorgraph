@@ -1,4 +1,4 @@
-use crate::device::Device;
+use tensorgraph_sys::device::Device;
 
 pub mod cpu;
 

@@ -1,11 +1,13 @@
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use tensorgraph_sys::{
-    blas::{cpu::CpuContext, BLASContext, GEMM},
     device::DefaultDeviceAllocator,
     vec::{vec_from_host, Vec},
 };
 
-use tensorgraph_math::tensor::{gemm, Tensor};
+use tensorgraph_math::{
+    blas::{cpu::CpuContext, BLASContext, GEMM},
+    tensor::{gemm, Tensor},
+};
 
 /// Performs 1000 matrix mulitplications on a 256x256 matrix
 pub fn matmul_1000_256<D: DefaultDeviceAllocator, C: BLASContext<Device = D> + Copy>(
@@ -63,14 +65,14 @@ pub fn matmul(c: &mut Criterion) {
 
     #[cfg(feature = "cublas")]
     {
-        use tensorgraph_sys::blas::cublas::CublasContext;
+        use tensorgraph_math::blas::cublas::CublasContext;
         use tensorgraph_sys::device::cuda::{with_stream, Context, Stream};
 
         let _ctx = Context::quick_init().unwrap();
 
         with_stream(&Stream::new().unwrap(), |cuda| {
             let ctx = CublasContext::new();
-            let ctx = cuda.init_cublas(&ctx);
+            let ctx = ctx.with_stream(Some(cuda));
 
             group.bench_function("cublas", |b| {
                 b.iter(|| {

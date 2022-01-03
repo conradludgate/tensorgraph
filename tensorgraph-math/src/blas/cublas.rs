@@ -1,12 +1,11 @@
 use std::{ops::Deref, ptr::NonNull};
 
-use cust::memory::DevicePointer;
 use rcublas_sys::{
     cublasContext, cublasCreate_v2, cublasDestroy_v2, cublasDgemm_v2, cublasHandle_t,
     cublasSetStream_v2, cublasSgemm_v2, cublasStatus_t,
 };
 
-use crate::device::cuda::{Cuda, SharedStream};
+use tensorgraph_sys::device::{cuda::{Cuda, SharedStream}, Device};
 
 use super::{BLASContext, GEMM};
 
@@ -86,6 +85,8 @@ impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
         }
     }
 }
+
+type DevicePointer<T> = <Cuda as Device>::Ptr<T>;
 
 impl<'a> GEMM<&'a SharedCublasContext> for f32 {
     unsafe fn gemm(
