@@ -23,14 +23,14 @@ pub trait StorageMut: Storage + AsMut<Ref<[Self::T], Self::Device>> {}
 
 // Vec
 
-impl<T, A: DeviceAllocator> Storage for Vec<T, A> {
+impl<T, A: DeviceAllocator<D>, D: Device> Storage for Vec<T, A, D> {
     type T = T;
-    type Device = A::Device;
+    type Device = D;
 }
 
-impl<T, A: DeviceAllocator> StorageMut for Vec<T, A> {}
+impl<T, A: DeviceAllocator<D>, D: Device> StorageMut for Vec<T, A, D> {}
 
-impl<T, A: DeviceAllocator> IntoOwned for Vec<T, A> {
+impl<T, A: DeviceAllocator<D>, D: Device> IntoOwned for Vec<T, A, D> {
     type Owned = Self;
     fn into_owned(self) -> Self::Owned {
         self
@@ -45,7 +45,7 @@ impl<'a, T, D: Device> Storage for &'a Ref<[T], D> {
 }
 
 impl<'a, T: Copy, D: DefaultDeviceAllocator> IntoOwned for &'a Ref<[T], D> {
-    type Owned = Vec<T, D::Alloc>;
+    type Owned = Vec<T, D::Alloc, D>;
     fn into_owned(self) -> Self::Owned {
         self.to_owned()
     }
@@ -61,7 +61,7 @@ impl<'a, T, D: Device> Storage for &'a mut Ref<[T], D> {
 impl<'a, T, D: Device> StorageMut for &'a mut Ref<[T], D> {}
 
 impl<'a, T: Copy, D: DefaultDeviceAllocator> IntoOwned for &'a mut Ref<[T], D> {
-    type Owned = Vec<T, D::Alloc>;
+    type Owned = Vec<T, D::Alloc, D>;
     fn into_owned(self) -> Self::Owned {
         self.to_owned()
     }

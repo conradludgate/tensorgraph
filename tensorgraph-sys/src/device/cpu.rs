@@ -63,9 +63,8 @@ impl<T: ?Sized> From<NonNull<T, Cpu>> for std::ptr::NonNull<T> {
     }
 }
 
-impl<A: Allocator> DeviceAllocator for A {
+impl<A: Allocator> DeviceAllocator<Cpu> for A {
     type AllocError = AllocError;
-    type Device = Cpu;
 
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8], Cpu>, AllocError> {
         self.allocate(layout).map(NonNull::from)
