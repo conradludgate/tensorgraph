@@ -75,13 +75,47 @@ impl Device for Cuda {
     }
 }
 
+impl SharedStream {
+    unsafe fn grow_impl(
+        &self,
+        ptr: NonNull<u8, Cuda>,
+        old_layout: std::alloc::Layout,
+        new_layout: std::alloc::Layout,
+        zeroed: bool,
+    ) -> CudaResult<NonNull<[u8], Cuda>> {
+        debug_assert!(
+            new_layout.size() >= old_layout.size(),
+            "`new_layout.size()` must be greater than or equal to `old_layout.size()`"
+        );
+
+        let new = if zeroed {
+            self.allocate_zeroed(new_layout)
+        } else {
+            self.allocate(new_layout)
+        }?;
+
+        let size = old_layout.size();
+        if size != 0 {
+            cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.inner())
+                .to_cuda_result()?;
+            cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner()).to_cuda_result()?;
+        }
+
+        Ok(new)
+    }
+}
+
 impl<'a> DeviceAllocator<Cuda> for &'a SharedStream {
     type AllocError = CudaError;
 
     fn allocate(&self, layout: std::alloc::Layout) -> CudaResult<NonNull<[u8], Cuda>> {
         let size = layout.size();
         if size == 0 {
-            return Err(CudaError::InvalidMemoryAllocation);
+            unsafe {
+                let dangling =
+                    NonNull::new_unchecked(DevicePointer::from_raw(layout.dangling().as_ptr()));
+                return Ok(NonNull::slice_from_raw_parts(dangling, 0));
+            }
         }
 
         let mut ptr: *mut c_void = std::ptr::null_mut();
@@ -102,10 +136,12 @@ impl<'a> DeviceAllocator<Cuda> for &'a SharedStream {
         Ok(ptr)
     }
 
-    unsafe fn deallocate(&self, ptr: NonNull<u8, Cuda>, _layout: std::alloc::Layout) {
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner())
-            .to_cuda_result()
-            .unwrap();
+    unsafe fn deallocate(&self, ptr: NonNull<u8, Cuda>, layout: std::alloc::Layout) {
+        if layout.size() != 0 {
+            cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner())
+                .to_cuda_result()
+                .unwrap();
+        }
     }
 
     unsafe fn grow(
@@ -114,13 +150,7 @@ impl<'a> DeviceAllocator<Cuda> for &'a SharedStream {
         old_layout: std::alloc::Layout,
         new_layout: std::alloc::Layout,
     ) -> CudaResult<NonNull<[u8], Cuda>> {
-        let new = self.allocate(new_layout)?;
-
-        let size = old_layout.size();
-        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.inner()).to_cuda_result()?;
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner()).to_cuda_result()?;
-
-        Ok(new)
+        self.grow_impl(ptr, old_layout, new_layout, false)
     }
 
     unsafe fn grow_zeroed(
@@ -129,28 +159,35 @@ impl<'a> DeviceAllocator<Cuda> for &'a SharedStream {
         old_layout: std::alloc::Layout,
         new_layout: std::alloc::Layout,
     ) -> CudaResult<NonNull<[u8], Cuda>> {
-        let new = self.allocate_zeroed(new_layout)?;
-
-        let size = old_layout.size();
-        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.inner()).to_cuda_result()?;
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner()).to_cuda_result()?;
-
-        Ok(new)
+        self.grow_impl(ptr, old_layout, new_layout, true)
     }
 
     unsafe fn shrink(
         &self,
         ptr: NonNull<u8, Cuda>,
-        _old_layout: std::alloc::Layout,
+        old_layout: std::alloc::Layout,
         new_layout: std::alloc::Layout,
     ) -> CudaResult<NonNull<[u8], Cuda>> {
+        debug_assert!(
+            new_layout.size() <= old_layout.size(),
+            "`new_layout.size()` must be less than or equal to `old_layout.size()`"
+        );
+
         let size = new_layout.size();
-        let new = self.allocate(new_layout)?;
 
-        cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.inner()).to_cuda_result()?;
-        cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner()).to_cuda_result()?;
+        if size == 0 {
+            let dangling =
+                NonNull::new_unchecked(DevicePointer::from_raw(new_layout.dangling().as_ptr()));
+            Ok(NonNull::slice_from_raw_parts(dangling, 0))
+        } else {
+            let new = self.allocate(new_layout)?;
 
-        Ok(new)
+            cust_raw::cuMemcpyAsync(d_ptr(new), d_ptr1(ptr), size, self.inner())
+                .to_cuda_result()?;
+            cust_raw::cuMemFreeAsync(d_ptr1(ptr), self.inner()).to_cuda_result()?;
+
+            Ok(new)
+        }
     }
 }
 
