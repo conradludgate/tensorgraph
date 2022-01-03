@@ -1,16 +1,17 @@
 use std::{ops::Deref, ptr::NonNull};
 
 use rcublas_sys::{
-    cublasContext, cublasCreate_v2, cublasDestroy_v2, cublasDgemm_v2, cublasHandle_t,
-    cublasSetStream_v2, cublasSgemm_v2, cublasStatus_t,
+    cublasContext, cublasCreate_v2, cublasDestroy_v2, cublasHandle_t, cublasSetStream_v2,
+    cublasStatus_t,
 };
 
-use tensorgraph_sys::device::{
-    cuda::{Cuda, SharedStream},
-    Device,
-};
+use tensorgraph_sys::device::cuda::{Cuda, SharedStream};
 
 use super::{BLASContext, GEMM};
+
+mod gemm;
+mod global;
+pub use global::get_cublas;
 
 pub struct CublasContext {
     inner: NonNull<cublasContext>,
@@ -77,94 +78,6 @@ impl SharedCublasContext {
 
 impl<'a> BLASContext for &'a SharedCublasContext {
     type Device = Cuda;
-}
-
-impl From<super::MatrixOp> for rcublas_sys::cublasOperation_t {
-    fn from(op: super::MatrixOp) -> Self {
-        match op {
-            super::MatrixOp::NoTrans => rcublas_sys::cublasOperation_t::CUBLAS_OP_N,
-            super::MatrixOp::Trans => rcublas_sys::cublasOperation_t::CUBLAS_OP_T,
-            // super::MatrixOp::ConjTrans => rcublas_sys::cublasOperation_t::CUBLAS_OP_HERMITAN,
-        }
-    }
-}
-
-type DevicePointer<T> = <Cuda as Device>::Ptr<T>;
-
-impl<'a> GEMM<&'a SharedCublasContext> for f32 {
-    unsafe fn gemm(
-        handle: &SharedCublasContext,
-        transa: super::MatrixOp,
-        transb: super::MatrixOp,
-        m: i32,
-        n: i32,
-        k: i32,
-        alpha: f32,
-        a: DevicePointer<f32>,
-        lda: i32,
-        b: DevicePointer<f32>,
-        ldb: i32,
-        beta: f32,
-        mut c: DevicePointer<f32>,
-        ldc: i32,
-    ) {
-        cublasSgemm_v2(
-            handle.handle(),
-            transa.into(),
-            transb.into(),
-            m,
-            n,
-            k,
-            &alpha,
-            a.as_raw(),
-            lda,
-            b.as_raw(),
-            ldb,
-            &beta,
-            c.as_raw_mut(),
-            ldc,
-        )
-        .to_cublas_result()
-        .unwrap();
-    }
-}
-
-impl<'a> GEMM<&'a SharedCublasContext> for f64 {
-    unsafe fn gemm(
-        handle: &SharedCublasContext,
-        transa: super::MatrixOp,
-        transb: super::MatrixOp,
-        m: i32,
-        n: i32,
-        k: i32,
-        alpha: f64,
-        a: DevicePointer<f64>,
-        lda: i32,
-        b: DevicePointer<f64>,
-        ldb: i32,
-        beta: f64,
-        mut c: DevicePointer<f64>,
-        ldc: i32,
-    ) {
-        cublasDgemm_v2(
-            handle.handle(),
-            transa.into(),
-            transb.into(),
-            m,
-            n,
-            k,
-            &alpha,
-            a.as_raw(),
-            lda,
-            b.as_raw(),
-            ldb,
-            &beta,
-            c.as_raw_mut(),
-            ldc,
-        )
-        .to_cublas_result()
-        .unwrap();
-    }
 }
 
 #[derive(Debug, Clone, Copy)]

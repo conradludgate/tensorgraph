@@ -1,18 +1,19 @@
-use std::{ops::Deref, ptr::NonNull};
+use std::{marker::PhantomData, ops::Deref, ptr::NonNull};
 
 use cust::error::CudaResult;
 use cust_raw::{CUstream, CUstream_st};
 
-use super::ToCudaResult;
+use super::{SharedContext, ToCudaResult};
 
 /// Represents an owned CUDA Stream.
-pub struct Stream {
+pub struct Stream<'ctx> {
     inner: NonNull<CUstream_st>,
+    _marker: PhantomData<&'ctx SharedContext>,
 }
 
-impl Stream {
+impl<'ctx> Stream<'ctx> {
     /// Create a new CUDA Stream
-    pub fn new() -> CudaResult<Self> {
+    pub fn new(_ctx: &'ctx SharedContext) -> CudaResult<Self> {
         let mut stream = std::ptr::null_mut();
 
         unsafe {
@@ -20,12 +21,13 @@ impl Stream {
 
             Ok(Self {
                 inner: NonNull::new_unchecked(stream),
+                _marker: PhantomData,
             })
         }
     }
 }
 
-impl Deref for Stream {
+impl<'ctx> Deref for Stream<'ctx> {
     type Target = SharedStream;
 
     fn deref(&self) -> &Self::Target {
@@ -33,7 +35,7 @@ impl Deref for Stream {
     }
 }
 
-impl Drop for Stream {
+impl<'ctx> Drop for Stream<'ctx> {
     fn drop(&mut self) {
         unsafe {
             cust_raw::cuStreamDestroy_v2(self.inner.as_mut());

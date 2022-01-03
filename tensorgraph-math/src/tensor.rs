@@ -392,8 +392,8 @@ mod tests {
         use crate::blas::cublas::CublasContext;
         use tensorgraph_sys::device::cuda::{Context, Stream};
 
-        let _ctx = Context::quick_init().unwrap();
-        let cuda = Stream::new().unwrap();
+        let ctx = Context::quick_init().unwrap();
+        let cuda = Stream::new(&ctx).unwrap();
         let cuda = cuda.deref();
 
         // column major
@@ -403,10 +403,10 @@ mod tests {
         let ctx = CublasContext::new();
         let ctx = ctx.with_stream(Some(cuda));
 
-        let a = Tensor::from_shape_in(ctx, [3, 2], a);
-        let b = Tensor::from_shape_in(ctx, [2, 2], b);
+        let a = Tensor::from_shape([3, 2], a);
+        let b = Tensor::from_shape([2, 2], b);
 
-        let c = a.dot_in(b, cuda);
+        let c = a.dot_into(b, ctx, cuda);
 
         let mut out = vec![0.0_f32; 6];
         c.data.copy_to_host(&mut out);
@@ -418,28 +418,28 @@ mod tests {
     #[cfg(feature = "cublas")]
     fn matmul_cuda_global() {
         use crate::blas::cublas::CublasContext;
-        use tensorgraph_sys::device::cuda::{with_stream, Context, Cuda, Stream};
+        use tensorgraph_sys::device::cuda::{Context, Cuda, Stream};
 
-        let _ctx = Context::quick_init().unwrap();
-        let cuda = Stream::new().unwrap();
+        let ctx = Context::quick_init().unwrap();
+        let cuda = Stream::new(&ctx).unwrap();
 
-        let out = with_stream(&cuda, |cuda| {
+        let out = cuda.global_over(|cuda| {
             // column major
             let a = vec_from_host::<f32, Cuda>(&[0., 2., 4., 1., 3., 5.]);
             let b = vec_from_host::<f32, Cuda>(&[0., 2., 1., 3.]);
 
             let ctx = CublasContext::new();
-            let ctx = ctx.with_stream(Some(cuda));
+            ctx.with_stream(Some(cuda)).global_over(|_ctx| {
+                let a = Tensor::from_shape([3, 2], a);
+                let b = Tensor::from_shape([2, 2], b);
 
-            let a = Tensor::from_shape_in(ctx, [3, 2], a);
-            let b = Tensor::from_shape_in(ctx, [2, 2], b);
+                let c = a.dot(b);
 
-            let c = a.dot(b);
+                let mut out = vec![0.0_f32; 6];
+                c.data.copy_to_host(&mut out);
 
-            let mut out = vec![0.0_f32; 6];
-            c.data.copy_to_host(&mut out);
-
-            out
+                out
+            })
         });
 
         assert_eq!(out, vec![2., 6., 10., 3., 11., 19.]);
@@ -478,11 +478,11 @@ mod tests {
     #[test]
     #[cfg(feature = "cublas")]
     fn matmul_cuda2() {
-        use crate::blas::cublas::CublasContext;
+        use crate::{blas::cublas::CublasContext, tensor::gemm_ctx};
         use tensorgraph_sys::device::cuda::{Context, Stream};
 
-        let _ctx = Context::quick_init().unwrap();
-        let cuda = Stream::new().unwrap();
+        let ctx = Context::quick_init().unwrap();
+        let cuda = Stream::new(&ctx).unwrap();
         let cuda = cuda.deref();
 
         // column major
@@ -493,12 +493,12 @@ mod tests {
         let ctx = CublasContext::new();
         let ctx = ctx.with_stream(Some(cuda));
 
-        let mut a = Tensor::from_shape_in(ctx, [2, 2], a);
-        let b = Tensor::from_shape_in(ctx, [2, 2], b);
-        let mut c = Tensor::from_shape_in(ctx, [2, 2], c);
+        let mut a = Tensor::from_shape([2, 2], a);
+        let b = Tensor::from_shape([2, 2], b);
+        let mut c = Tensor::from_shape([2, 2], c);
 
         for _ in 0..1000 {
-            gemm(1., a.view(), b.view(), 0., c.view_mut());
+            gemm_ctx(ctx, 1., a.share(), b.share(), 0., c.share_mut());
             std::mem::swap(&mut a, &mut c);
         }
 

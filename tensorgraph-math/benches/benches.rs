@@ -1,23 +1,23 @@
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use tensorgraph_sys::{
-    device::DefaultDeviceAllocator,
+    device::{cpu::Cpu, cuda::Cuda, DefaultDeviceAllocator},
     vec::{vec_from_host, Vec},
     Share, ShareMut,
 };
 
 use tensorgraph_math::{
-    blas::{cpu::CpuContext, BLASContext, GEMM},
+    blas::{DefaultBLASContext, GEMM},
     tensor::{gemm_ctx, Tensor},
 };
 
 /// Performs 1000 matrix mulitplications on a 256x256 matrix
-pub fn matmul_1000_256<D: DefaultDeviceAllocator, C: BLASContext<Device = D> + Copy>(
+pub fn matmul_1000_256<D: DefaultDeviceAllocator + DefaultBLASContext>(
     init: &[f64],
-    ctx: C,
 ) -> Vec<f64, D::Alloc>
 where
-    f64: GEMM<C>,
+    f64: GEMM<D::Context>,
     D::Alloc: Clone,
+    D::Context: Copy,
 {
     let a = vec_from_host::<f64, D>(init);
     let b = a.clone();
@@ -27,6 +27,7 @@ where
     let b = Tensor::from_shape([256, 256], b);
     let mut c = Tensor::from_shape([256, 256], c);
 
+    let ctx = D::Context::default();
     for _ in 0..1000 {
         gemm_ctx(ctx, 1., a.share(), b.share(), 0., c.share_mut());
         std::mem::swap(&mut a, &mut c);
@@ -46,7 +47,7 @@ pub fn matmul(c: &mut Criterion) {
     }
 
     let cpu = |b: &mut Bencher| {
-        b.iter(|| black_box(matmul_1000_256(&init, CpuContext)));
+        b.iter(|| black_box(matmul_1000_256::<Cpu>(&init)));
     };
 
     #[cfg(feature = "openblas")]
@@ -67,23 +68,22 @@ pub fn matmul(c: &mut Criterion) {
     #[cfg(feature = "cublas")]
     {
         use tensorgraph_math::blas::cublas::CublasContext;
-        use tensorgraph_sys::device::cuda::{with_stream, Context, Stream};
+        use tensorgraph_sys::device::cuda::{Context, Stream};
 
-        let _ctx = Context::quick_init().unwrap();
-
-        with_stream(&Stream::new().unwrap(), |cuda| {
+        let ctx = Context::quick_init().unwrap();
+        Stream::new(&ctx).unwrap().global_over(|cuda| {
             let ctx = CublasContext::new();
-            let ctx = ctx.with_stream(Some(cuda));
+            ctx.with_stream(Some(cuda)).global_over(|_ctx| {
+                group.bench_function("cublas", |b| {
+                    b.iter(|| {
+                        // includes the time to sync data in the benchmark
+                        let mut out = vec![0.0f64; 256 * 256];
+                        matmul_1000_256::<Cuda>(&init).copy_to_host(&mut out);
 
-            group.bench_function("cublas", |b| {
-                b.iter(|| {
-                    // includes the time to sync data in the benchmark
-                    let mut out = vec![0.0f64; 256 * 256];
-                    matmul_1000_256(&init, ctx).copy_to_host(&mut out);
-
-                    black_box(out)
+                        black_box(out)
+                    });
                 });
-            });
+            })
         });
     }
 

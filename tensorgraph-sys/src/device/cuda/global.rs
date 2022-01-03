@@ -10,19 +10,21 @@ use super::{Cuda, SharedStream};
 static GLOBAL: Lazy<RefCell<Option<std::ptr::NonNull<CUstream_st>>>> =
     Lazy::new(|| RefCell::new(None));
 
-/// Runs the given closure with the specified stream as the global
-pub fn with_stream<R, F: FnOnce(&SharedStream) -> R>(stream: &SharedStream, f: F) -> R {
-    let pointer = GLOBAL.deref();
+impl SharedStream {
+    /// Runs the given closure with the stream as the global thread-local stream
+    pub fn global_over<R, F: FnOnce(&Self) -> R>(&self, f: F) -> R {
+        let pointer = GLOBAL.deref();
 
-    let old = pointer.replace(Some(unsafe {
-        std::ptr::NonNull::new_unchecked(stream.inner())
-    }));
+        let old = pointer.replace(Some(unsafe {
+            std::ptr::NonNull::new_unchecked(self.inner())
+        }));
 
-    let out = f(stream);
+        let out = f(self);
 
-    let _stream = pointer.replace(old);
+        let _stream = pointer.replace(old);
 
-    out
+        out
+    }
 }
 
 /// Get the global stream set via [`with_stream`]

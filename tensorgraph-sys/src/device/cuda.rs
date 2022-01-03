@@ -14,7 +14,7 @@ mod global;
 mod stream;
 // pub mod global;
 pub use context::{AttachedContext, Context, FloatingContext, SharedContext};
-pub use global::{get_stream, with_stream};
+pub use global::get_stream;
 pub use stream::{SharedStream, Stream};
 
 #[derive(Debug)]
@@ -89,7 +89,7 @@ impl<'a> DeviceAllocator for &'a SharedStream {
                 .to_cuda_result()?;
         }
         let ptr = std::ptr::from_raw_parts_mut(ptr as *mut (), size);
-        Ok(NonNull::new_unchecked(DevicePointer::wrap(ptr)))
+        unsafe { Ok(NonNull::new_unchecked(DevicePointer::wrap(ptr))) }
     }
 
     fn allocate_zeroed(
