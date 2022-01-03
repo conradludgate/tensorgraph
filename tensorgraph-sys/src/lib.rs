@@ -10,14 +10,14 @@
     generic_const_exprs,
     thread_local,
     once_cell,
-    layout_for_ptr,
+    layout_for_ptr
 )]
 
+pub mod boxed;
 pub mod device;
 pub mod ptr;
 pub mod vec;
 pub mod zero;
-pub mod boxed;
 
 /// Represents a type that can be shared.
 /// Mimics the impl for [`std::ops::Deref`] but makes use of `GAT`'s in order

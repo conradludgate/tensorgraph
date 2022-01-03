@@ -88,7 +88,8 @@ impl<A: Allocator> DeviceAllocator for A {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Cpu>, AllocError> {
-        self.grow(ptr.into(), old_layout, new_layout).map(NonNull::from)
+        self.grow(ptr.into(), old_layout, new_layout)
+            .map(NonNull::from)
     }
 
     unsafe fn grow_zeroed(
@@ -97,7 +98,8 @@ impl<A: Allocator> DeviceAllocator for A {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Cpu>, AllocError> {
-        self.grow_zeroed(ptr.into(), old_layout, new_layout).map(NonNull::from)
+        self.grow_zeroed(ptr.into(), old_layout, new_layout)
+            .map(NonNull::from)
     }
 
     unsafe fn shrink(
@@ -106,6 +108,7 @@ impl<A: Allocator> DeviceAllocator for A {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Cpu>, AllocError> {
-        self.shrink(ptr.into(), old_layout, new_layout).map(NonNull::from)
+        self.shrink(ptr.into(), old_layout, new_layout)
+            .map(NonNull::from)
     }
 }

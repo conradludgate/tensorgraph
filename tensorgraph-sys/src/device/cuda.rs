@@ -77,18 +77,17 @@ impl<'a> DeviceAllocator for &'a SharedStream {
     type AllocError = CudaError;
     type Device = Cuda;
 
-    fn allocate(
-        &self,
-        layout: std::alloc::Layout,
-    ) -> CudaResult<NonNull<[u8], Self::Device>> {
+    fn allocate(&self, layout: std::alloc::Layout) -> CudaResult<NonNull<[u8], Self::Device>> {
         let size = layout.size();
         if size == 0 {
             return Err(CudaError::InvalidMemoryAllocation);
         }
 
         let mut ptr: *mut c_void = std::ptr::null_mut();
-        unsafe { cust_raw::cuMemAllocAsync(&mut ptr as *mut *mut c_void as *mut u64, size, self.inner())
-            .to_cuda_result()?; }
+        unsafe {
+            cust_raw::cuMemAllocAsync(&mut ptr as *mut *mut c_void as *mut u64, size, self.inner())
+                .to_cuda_result()?;
+        }
         let ptr = std::ptr::from_raw_parts_mut(ptr as *mut (), size);
         Ok(NonNull::new_unchecked(DevicePointer::wrap(ptr)))
     }
@@ -99,7 +98,9 @@ impl<'a> DeviceAllocator for &'a SharedStream {
     ) -> CudaResult<NonNull<[u8], Self::Device>> {
         let size = layout.size();
         let ptr = self.allocate(layout)?;
-        unsafe { cust_raw::cuMemsetD8Async(d_ptr(ptr), 0, size, self.inner()).to_cuda_result()?; }
+        unsafe {
+            cust_raw::cuMemsetD8Async(d_ptr(ptr), 0, size, self.inner()).to_cuda_result()?;
+        }
         Ok(ptr)
     }
 

@@ -57,7 +57,6 @@ impl RemoveDim for std::vec::Vec<usize> {
     }
 }
 
-
 /// Insert an axis into a dimension
 pub trait InsertDim: Dimension {
     type Larger: Dimension;

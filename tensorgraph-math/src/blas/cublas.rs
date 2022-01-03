@@ -5,7 +5,10 @@ use rcublas_sys::{
     cublasSetStream_v2, cublasSgemm_v2, cublasStatus_t,
 };
 
-use tensorgraph_sys::device::{cuda::{Cuda, SharedStream}, Device};
+use tensorgraph_sys::device::{
+    cuda::{Cuda, SharedStream},
+    Device,
+};
 
 use super::{BLASContext, GEMM};
 

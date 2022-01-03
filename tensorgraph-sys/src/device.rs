@@ -85,10 +85,7 @@ pub trait DeviceAllocator {
     /// Device that the allocations will live in.
     type Device: Device;
 
-    fn allocate(
-        &self,
-        layout: Layout,
-    ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
 
     fn allocate_zeroed(
         &self,
