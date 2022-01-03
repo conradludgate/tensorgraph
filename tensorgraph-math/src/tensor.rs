@@ -3,7 +3,7 @@ use std::mem::MaybeUninit;
 use num_traits::{One, Zero};
 
 use tensorgraph_sys::{
-    device::{DefaultDeviceAllocator, DeviceAllocator},
+    device::{DefaultDeviceAllocator, Device, DeviceAllocator},
     ptr::reef::Ref,
     vec::Vec,
     Share, ShareMut,
@@ -16,65 +16,50 @@ use crate::{
 };
 
 /// A multidimensional data structure not unlike [`ndarray::ArrayBase`].
-pub struct Tensor<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> {
+pub struct Tensor<S: Storage, Dim: Dimension> {
     shape: Dim,
     strides: Dim,
     data: S,
-    ctx: C,
 }
 
-impl<S: Storage, Dim: Dimension> Tensor<S, <S::Device as DefaultBLASContext>::Context, Dim>
-where
-    S::Device: DefaultBLASContext,
-{
-    pub fn from_shape(shape: Dim, data: S) -> Self {
-        Self::from_shape_in(S::Device::default_ctx(), shape, data)
-    }
-}
-
-impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Share for Tensor<S, C, Dim> {
+impl<S: Storage, Dim: Dimension> Share for Tensor<S, Dim> {
     type Ref<'a>
     where
         Self: 'a,
-    = TensorView<'a, S::T, S::Device, C, Dim>;
+    = TensorView<'a, S::T, S::Device, Dim>;
 
-    fn share(&self) -> TensorView<S::T, S::Device, C, Dim> {
+    fn share(&self) -> TensorView<S::T, S::Device, Dim> {
         Tensor {
             shape: self.shape.clone(),
             strides: self.strides.clone(),
             data: self.data.as_ref(),
-            ctx: self.ctx.clone(),
         }
     }
 }
 
-impl<S: StorageMut, C: BLASContext<Device = S::Device>, Dim: Dimension> ShareMut
-    for Tensor<S, C, Dim>
-{
+impl<S: StorageMut, Dim: Dimension> ShareMut for Tensor<S, Dim> {
     type Mut<'a>
     where
         Self: 'a,
-    = TensorViewMut<'a, S::T, S::Device, C, Dim>;
+    = TensorViewMut<'a, S::T, S::Device, Dim>;
 
-    fn share_mut(&mut self) -> TensorViewMut<S::T, S::Device, C, Dim> {
+    fn share_mut(&mut self) -> TensorViewMut<S::T, S::Device, Dim> {
         Tensor {
             shape: self.shape.clone(),
             strides: self.strides.clone(),
             data: self.data.as_mut(),
-            ctx: self.ctx.clone(),
         }
     }
 }
 
-impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Tensor<S, C, Dim> {
-    pub fn from_shape_in(ctx: C, shape: Dim, data: S) -> Self {
+impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
+    pub fn from_shape(shape: Dim, data: S) -> Self {
         assert_eq!(data.as_ref().len(), shape.len());
         let strides = shape.column_major_strides();
         Self {
             shape,
             strides,
             data,
-            ctx,
         }
     }
 
@@ -92,13 +77,13 @@ impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Tensor<S, C
         self.strides.as_mut().swap(i, j);
     }
 
-    pub fn t(&self) -> TensorView<S::T, S::Device, C, Dim> {
+    pub fn t(&self) -> TensorView<S::T, S::Device, Dim> {
         let mut view = self.share();
         view.reverse_axes();
         view
     }
 
-    pub fn into_owned(self) -> Tensor<S::Owned, C, Dim>
+    pub fn into_owned(self) -> Tensor<S::Owned, Dim>
     where
         S: IntoOwned,
         S::Owned: Storage<T = S::T, Device = S::Device>,
@@ -107,11 +92,10 @@ impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Tensor<S, C
             shape: self.shape,
             strides: self.strides,
             data: self.data.into_owned(),
-            ctx: self.ctx,
         }
     }
 
-    pub fn slice_axis(&self, axis: usize, n: usize) -> TensorView<S::T, S::Device, C, Dim::Smaller>
+    pub fn slice_axis(&self, axis: usize, n: usize) -> TensorView<S::T, S::Device, Dim::Smaller>
     where
         Dim: RemoveDim,
     {
@@ -126,39 +110,52 @@ impl<S: Storage, C: BLASContext<Device = S::Device>, Dim: Dimension> Tensor<S, C
             shape,
             strides,
             data: &self.data.as_ref()[s * n..],
-            ctx: self.ctx.clone(),
         }
     }
 }
 
 pub type DefaultVec<T, D> = Vec<T, <D as DefaultDeviceAllocator>::Alloc>;
-pub type TensorView<'a, T, D, C, Dim> = Tensor<&'a Ref<[T], D>, C, Dim>;
-pub type TensorViewMut<'a, T, D, C, Dim> = Tensor<&'a mut Ref<[T], D>, C, Dim>;
-pub type UninitTensor<'a, T, D, C, Dim> = TensorViewMut<'a, MaybeUninit<T>, D, C, Dim>;
+pub type TensorView<'a, T, D, Dim> = Tensor<&'a Ref<[T], D>, Dim>;
+pub type TensorViewMut<'a, T, D, Dim> = Tensor<&'a mut Ref<[T], D>, Dim>;
+pub type UninitTensor<'a, T, D, Dim> = TensorViewMut<'a, MaybeUninit<T>, D, Dim>;
 
-pub type Matrix<S, C> = Tensor<S, C, [usize; 2]>;
-pub type MatrixView<'a, T, D, C> = Matrix<&'a Ref<[T], D>, C>;
-pub type MatrixViewMut<'a, T, D, C> = Matrix<&'a mut Ref<[T], D>, C>;
-pub type UninitMatrix<'a, T, D, C> = MatrixViewMut<'a, MaybeUninit<T>, D, C>;
+pub type Matrix<S> = Tensor<S, [usize; 2]>;
+pub type MatrixView<'a, T, D> = Matrix<&'a Ref<[T], D>>;
+pub type MatrixViewMut<'a, T, D> = Matrix<&'a mut Ref<[T], D>>;
+pub type UninitMatrix<'a, T, D> = MatrixViewMut<'a, MaybeUninit<T>, D>;
 
-impl<S: Storage, C: BLASContext<Device = S::Device>> Matrix<S, C> {
+impl<S: Storage> Matrix<S> {
     pub fn dot(
         &self,
-        rhs: Matrix<impl Storage<T = S::T, Device = S::Device>, C>,
-    ) -> Matrix<DefaultVec<S::T, S::Device>, C>
+        rhs: Matrix<impl Storage<T = S::T, Device = S::Device>>,
+    ) -> Matrix<DefaultVec<S::T, S::Device>>
+    where
+        S::T: Zero + One,
+        S::Device: DefaultDeviceAllocator + DefaultBLASContext,
+        S::T: GEMM<<S::Device as DefaultBLASContext>::Context>,
+    {
+        self.dot_using(rhs, S::Device::default_ctx())
+    }
+
+    pub fn dot_using<C: BLASContext<Device = S::Device>>(
+        &self,
+        rhs: Matrix<impl Storage<T = S::T, Device = S::Device>>,
+        ctx: C,
+    ) -> Matrix<DefaultVec<S::T, S::Device>>
     where
         S::T: Zero + One,
         S::Device: DefaultDeviceAllocator,
         S::T: GEMM<C>,
     {
-        self.dot_in(rhs, S::Device::default_alloc())
+        self.dot_into(rhs, ctx, S::Device::default_alloc())
     }
 
-    pub fn dot_in<A: DeviceAllocator<Device = S::Device>>(
+    pub fn dot_into<C: BLASContext<Device = S::Device>, A: DeviceAllocator<Device = S::Device>>(
         &self,
-        rhs: Matrix<impl Storage<T = S::T, Device = S::Device>, C>,
+        rhs: Matrix<impl Storage<T = S::T, Device = S::Device>>,
+        ctx: C,
         alloc: A,
-    ) -> Matrix<Vec<S::T, A>, C>
+    ) -> Matrix<Vec<S::T, A>>
     where
         S::T: Zero + One,
         S::T: GEMM<C>,
@@ -167,65 +164,79 @@ impl<S: Storage, C: BLASContext<Device = S::Device>> Matrix<S, C> {
         let cols = rhs.shape[1];
         let mut v = Vec::with_capacity_in(rows * cols, alloc);
         unsafe {
-            let uninit = Matrix::from_shape_in(
-                self.ctx.clone(),
-                [rows, cols],
-                &mut v.space_capacity_mut()[..rows * cols],
-            );
+            let uninit =
+                Matrix::from_shape([rows, cols], &mut v.space_capacity_mut()[..rows * cols]);
 
-            gemm_uninit(S::T::one(), self.share(), rhs, uninit);
+            gemm_uninit_ctx(ctx, S::T::one(), self.share(), rhs, uninit);
 
             v.set_len(rows * cols);
         }
-        Matrix::from_shape_in(self.ctx.clone(), [rows, cols], v)
+        Matrix::from_shape([rows, cols], v)
     }
 }
 
-impl<'a, T: Copy, C: BLASContext, Dim: Dimension> UninitTensor<'a, T, C::Device, C, Dim> {
+impl<'a, T: Copy, D: Device, Dim: Dimension> UninitTensor<'a, T, D, Dim> {
     /// # Safety
     /// Contents must be initialised
-    pub unsafe fn assume_init(self) -> TensorViewMut<'a, T, C::Device, C, Dim> {
+    pub unsafe fn assume_init(self) -> TensorViewMut<'a, T, D, Dim> {
         Tensor {
             shape: self.shape,
             strides: self.strides,
             data: self.data.assume_init_mut(),
-            ctx: self.ctx,
         }
     }
 }
 
-impl<'a, T: Copy, C: BLASContext, Dim: Dimension>
-    TensorView<'a, MaybeUninit<T>, C::Device, C, Dim>
-{
+impl<'a, T: Copy, D: Device, Dim: Dimension> TensorView<'a, MaybeUninit<T>, D, Dim> {
     /// # Safety
     /// Contents must be initialised
-    pub unsafe fn assume_init(self) -> TensorView<'a, T, C::Device, C, Dim> {
+    pub unsafe fn assume_init(self) -> TensorView<'a, T, D, Dim> {
         Tensor {
             shape: self.shape,
             strides: self.strides,
             data: self.data.assume_init(),
-            ctx: self.ctx,
         }
     }
 }
 
-pub fn gemm_uninit<F: GEMM<C> + Zero, C: BLASContext>(
+pub fn gemm_uninit<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
     alpha: F,
-    a: Matrix<impl Storage<T = F, Device = C::Device>, C>,
-    b: Matrix<impl Storage<T = F, Device = C::Device>, C>,
-    c: UninitMatrix<F, C::Device, C>,
+    a: Matrix<impl Storage<T = F, Device = D>>,
+    b: Matrix<impl Storage<T = F, Device = D>>,
+    c: UninitMatrix<F, D>,
+) {
+    gemm_uninit_ctx(D::default_ctx(), alpha, a, b, c)
+}
+
+pub fn gemm_uninit_ctx<F: GEMM<C> + Zero, C: BLASContext>(
+    ctx: C,
+    alpha: F,
+    a: Matrix<impl Storage<T = F, Device = C::Device>>,
+    b: Matrix<impl Storage<T = F, Device = C::Device>>,
+    c: UninitMatrix<F, C::Device>,
 ) {
     // Safety:
     // Specifying beta == 0.0 should allow c to be safely read while uninitialised
-    unsafe { gemm(alpha, a, b, F::zero(), c.assume_init()) }
+    unsafe { gemm_ctx(ctx, alpha, a, b, F::zero(), c.assume_init()) }
 }
 
-pub fn gemm<F: GEMM<C> + Zero, C: BLASContext>(
+pub fn gemm<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
     alpha: F,
-    a: Matrix<impl Storage<T = F, Device = C::Device>, C>,
-    b: Matrix<impl Storage<T = F, Device = C::Device>, C>,
+    a: Matrix<impl Storage<T = F, Device = D>>,
+    b: Matrix<impl Storage<T = F, Device = D>>,
     beta: F,
-    c: MatrixViewMut<F, C::Device, C>,
+    c: MatrixViewMut<F, D>,
+) {
+    gemm_ctx(D::default_ctx(), alpha, a, b, beta, c)
+}
+
+pub fn gemm_ctx<F: GEMM<C> + Zero, C: BLASContext>(
+    ctx: C,
+    alpha: F,
+    a: Matrix<impl Storage<T = F, Device = C::Device>>,
+    b: Matrix<impl Storage<T = F, Device = C::Device>>,
+    beta: F,
+    c: MatrixViewMut<F, C::Device>,
 ) {
     let [rowsa, colsa] = a.shape;
     let [rowsb, colsb] = b.shape;
@@ -247,7 +258,7 @@ pub fn gemm<F: GEMM<C> + Zero, C: BLASContext>(
 
     unsafe {
         F::gemm(
-            a.ctx,
+            ctx,
             transa,
             transb,
             m,

@@ -7,7 +7,7 @@ use tensorgraph_sys::{
 
 use tensorgraph_math::{
     blas::{cpu::CpuContext, BLASContext, GEMM},
-    tensor::{gemm, Tensor},
+    tensor::{gemm_ctx, Tensor},
 };
 
 /// Performs 1000 matrix mulitplications on a 256x256 matrix
@@ -23,12 +23,12 @@ where
     let b = a.clone();
     let c = b.clone();
 
-    let mut a = Tensor::from_shape_in(ctx, [256, 256], a);
-    let b = Tensor::from_shape_in(ctx, [256, 256], b);
-    let mut c = Tensor::from_shape_in(ctx, [256, 256], c);
+    let mut a = Tensor::from_shape([256, 256], a);
+    let b = Tensor::from_shape([256, 256], b);
+    let mut c = Tensor::from_shape([256, 256], c);
 
     for _ in 0..1000 {
-        gemm(1., a.share(), b.share(), 0., c.share_mut());
+        gemm_ctx(ctx, 1., a.share(), b.share(), 0., c.share_mut());
         std::mem::swap(&mut a, &mut c);
     }
 
