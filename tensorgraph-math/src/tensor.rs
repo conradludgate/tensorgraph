@@ -440,7 +440,7 @@ mod tests {
         let a = Tensor::from_shape([3, 2], a);
         let b = Tensor::from_shape([2, 2], b);
 
-        let c = a.dot_into(b, ctx, cuda);
+        let c = a.dot_into(b.view(), ctx, cuda);
 
         let mut out = vec![0.0_f32; 6];
         c.data.copy_to_host(&mut out);
@@ -471,7 +471,7 @@ mod tests {
         let a = Tensor::from_shape([3, 2], a);
         let b = Tensor::from_shape([2, 2], b);
 
-        let c = a.dot(b);
+        let c = a.dot(b.view());
 
         let mut out = vec![0.0_f32; 6];
         c.data.copy_to_host(&mut out);
@@ -532,7 +532,7 @@ mod tests {
         let mut c = Tensor::from_shape([2, 2], c);
 
         for _ in 0..1000 {
-            gemm_ctx(ctx, 1., a.share(), b.share(), 0., c.share_mut());
+            gemm_ctx(ctx, 1., a.view(), b.view(), 0., c.view_mut());
             std::mem::swap(&mut a, &mut c);
         }
 

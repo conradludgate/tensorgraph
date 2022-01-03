@@ -5,7 +5,7 @@ use cust::{
     memory::DevicePointer,
 };
 
-use crate::ptr::{non_null::NonNull, reef::Ref};
+use crate::ptr::{NonNull, Ref};
 
 use super::{Device, DeviceAllocator, DevicePtr};
 

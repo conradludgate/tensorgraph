@@ -1,5 +1,5 @@
 use tensorgraph_sys::{
-    device::cuda::{Context, Stream},
+    device::cuda::{Context, Cuda, Stream},
     DefaultVec, View,
 };
 
@@ -40,5 +40,8 @@ fn run() {
     //          10 19
 
     let c = a.dot(b.view());
-    assert_eq!(c.into_inner().into_std(), [2., 6., 10., 3., 11., 19.]);
+
+    let mut out = [0.; 6];
+    c.into_inner().copy_to_host(&mut out);
+    assert_eq!(out, [2., 6., 10., 3., 11., 19.]);
 }

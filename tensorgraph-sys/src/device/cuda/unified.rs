@@ -5,7 +5,7 @@ use cust_raw::CUmemAttach_flags_enum;
 
 use crate::{
     device::{cuda::ToCudaResult, DefaultDeviceAllocator, Device, DeviceAllocator},
-    ptr::{non_null::NonNull, reef::Ref},
+    ptr::{NonNull, Ref},
 };
 
 #[derive(Debug)]

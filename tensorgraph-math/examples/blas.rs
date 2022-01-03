@@ -1,5 +1,5 @@
-use tensorgraph_sys::View;
 use tensorgraph_math::tensor::Tensor;
+use tensorgraph_sys::View;
 
 fn main() {
     //     0 1

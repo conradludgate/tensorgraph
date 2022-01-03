@@ -1,9 +1,12 @@
 use tensorgraph_sys::{
-    device::cuda::{Context, Stream},
+    device::cuda::{Context, SharedStream, Stream},
     Vec, View,
 };
 
-use tensorgraph_math::{blas::cublas::CublasContext, tensor::Tensor};
+use tensorgraph_math::{
+    blas::cublas::{CublasContext, SharedCublasContext},
+    tensor::Tensor,
+};
 
 fn main() {
     // init cuda context
@@ -19,7 +22,7 @@ fn main() {
     run(cublas_ctx, &stream);
 }
 
-fn run(ctx: CublasContext, alloc: &Stream) {
+fn run(ctx: &SharedCublasContext, alloc: &SharedStream) {
     //     0 1
     // A = 2 3
     //     4 5
@@ -39,5 +42,8 @@ fn run(ctx: CublasContext, alloc: &Stream) {
     //          10 19
 
     let c = a.dot_into(b.view(), ctx, alloc);
-    assert_eq!(c.into_inner().into_std(), [2., 6., 10., 3., 11., 19.]);
+
+    let mut out = [0.; 6];
+    c.into_inner().copy_to_host(&mut out);
+    assert_eq!(out, [2., 6., 10., 3., 11., 19.]);
 }
