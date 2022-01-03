@@ -32,9 +32,6 @@ impl Device for Cpu {
 
 impl DefaultDeviceAllocator for Cpu {
     type Alloc = Global;
-    fn default_alloc() -> Global {
-        Global
-    }
 }
 
 impl<T: ?Sized> DevicePtr<T> for *mut T {

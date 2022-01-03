@@ -23,8 +23,7 @@ pub trait Device {
 /// Defines the default allocator for a device.
 /// For instance, The default allocator for [`cpu::Cpu`] is [`std::alloc::Global`]
 pub trait DefaultDeviceAllocator: Device {
-    type Alloc: DeviceAllocator<Device = Self>;
-    fn default_alloc() -> Self::Alloc;
+    type Alloc: DeviceAllocator<Device = Self> + Default;
 }
 
 /// Represents a type safe device-based pointer.

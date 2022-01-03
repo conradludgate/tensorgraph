@@ -134,7 +134,7 @@ impl<S: Storage> Matrix<S> {
         S::Device: DefaultDeviceAllocator + DefaultBLASContext,
         S::T: GEMM<<S::Device as DefaultBLASContext>::Context>,
     {
-        self.dot_using(rhs, S::Device::default_ctx())
+        self.dot_using(rhs, Default::default())
     }
 
     pub fn dot_using<C: BLASContext<Device = S::Device>>(
@@ -147,7 +147,7 @@ impl<S: Storage> Matrix<S> {
         S::Device: DefaultDeviceAllocator,
         S::T: GEMM<C>,
     {
-        self.dot_into(rhs, ctx, S::Device::default_alloc())
+        self.dot_into(rhs, ctx, Default::default())
     }
 
     pub fn dot_into<C: BLASContext<Device = S::Device>, A: DeviceAllocator<Device = S::Device>>(
@@ -205,7 +205,7 @@ pub fn gemm_uninit<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
     b: Matrix<impl Storage<T = F, Device = D>>,
     c: UninitMatrix<F, D>,
 ) {
-    gemm_uninit_ctx(D::default_ctx(), alpha, a, b, c)
+    gemm_uninit_ctx(D::Context::default(), alpha, a, b, c)
 }
 
 pub fn gemm_uninit_ctx<F: GEMM<C> + Zero, C: BLASContext>(
@@ -227,7 +227,7 @@ pub fn gemm<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
     beta: F,
     c: MatrixViewMut<F, D>,
 ) {
-    gemm_ctx(D::default_ctx(), alpha, a, b, beta, c)
+    gemm_ctx(D::Context::default(), alpha, a, b, beta, c)
 }
 
 pub fn gemm_ctx<F: GEMM<C> + Zero, C: BLASContext>(

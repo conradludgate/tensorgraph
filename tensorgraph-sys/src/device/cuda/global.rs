@@ -34,10 +34,6 @@ pub fn get_stream() -> Option<&'static SharedStream> {
 
 impl DefaultDeviceAllocator for Cuda {
     type Alloc = &'static SharedStream;
-
-    fn default_alloc() -> Self::Alloc {
-        get_stream().unwrap()
-    }
 }
 
 impl Default for &'static SharedStream {

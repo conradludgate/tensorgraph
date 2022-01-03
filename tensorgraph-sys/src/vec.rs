@@ -52,7 +52,7 @@ impl<T: Copy, A: DeviceAllocator + Clone> Clone for Vec<T, A> {
 }
 
 pub fn vec_from_host<T: Copy, D: DefaultDeviceAllocator>(slice: &[T]) -> Vec<T, D::Alloc> {
-    Vec::copy_from_host_in(slice, D::default_alloc())
+    Vec::copy_from_host_in(slice, D::Alloc::default())
 }
 
 impl<T, A: DeviceAllocator> Vec<T, A> {

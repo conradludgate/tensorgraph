@@ -102,7 +102,7 @@ impl<T: Copy, D: DefaultDeviceAllocator> ToOwned for Ref<[T], D> {
 
     fn to_owned(&self) -> Self::Owned {
         unsafe {
-            let mut v = Vec::with_capacity_in(self.len(), D::default_alloc());
+            let mut v = Vec::with_capacity_in(self.len(), D::Alloc::default());
             let buf = &mut v.space_capacity_mut()[..self.len()];
             buf.init_from_slice(self);
             v.set_len(self.len());

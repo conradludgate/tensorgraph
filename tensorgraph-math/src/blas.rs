@@ -20,8 +20,7 @@ pub trait BLASContext: Clone {
 
 /// The default blas context for a device
 pub trait DefaultBLASContext: Device {
-    type Context: BLASContext<Device = Self>;
-    fn default_ctx() -> Self::Context;
+    type Context: BLASContext<Device = Self> + Default;
 }
 
 /// A type that can be matrix multiplied

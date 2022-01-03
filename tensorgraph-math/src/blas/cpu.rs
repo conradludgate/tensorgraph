@@ -18,8 +18,4 @@ impl BLASContext for CpuContext {
 
 impl DefaultBLASContext for Cpu {
     type Context = CpuContext;
-
-    fn default_ctx() -> Self::Context {
-        CpuContext
-    }
 }
