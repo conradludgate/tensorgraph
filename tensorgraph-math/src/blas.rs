@@ -1,12 +1,13 @@
 use tensorgraph_sys::device::Device;
 
-pub mod cpu;
+mod cpu;
 
 #[cfg(feature = "cublas")]
 pub mod cublas;
 
 #[repr(u8)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
+/// Represents how a matrix can be represented internally.
 pub enum MatrixOp {
     NoTrans = b'N',
     Trans = b'T',

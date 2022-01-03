@@ -1,12 +1,11 @@
 use matrixmultiply::{dgemm, sgemm};
+use tensorgraph_sys::device::cpu::Cpu;
 
 use crate::blas::{MatrixOp, GEMM};
 
-use super::CpuContext;
-
-impl GEMM<CpuContext> for f32 {
+impl GEMM<(), Cpu> for f32 {
     unsafe fn gemm(
-        _ctx: CpuContext,
+        _ctx: (),
         transa: MatrixOp,
         transb: MatrixOp,
         m: i32,
@@ -45,9 +44,9 @@ impl GEMM<CpuContext> for f32 {
     }
 }
 
-impl GEMM<CpuContext> for f64 {
+impl GEMM<(), Cpu> for f64 {
     unsafe fn gemm(
-        _ctx: CpuContext,
+        _ctx: (),
         transa: MatrixOp,
         transb: MatrixOp,
         m: i32,

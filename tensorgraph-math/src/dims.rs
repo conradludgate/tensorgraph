@@ -1,7 +1,6 @@
 #[allow(clippy::len_without_is_empty)]
-/// A dimension type for a tensor
 pub trait Dimension: AsRef<[usize]> + AsMut<[usize]> + Clone {
-    fn len(&self) -> usize {
+    fn size(&self) -> usize {
         self.as_ref().iter().product()
     }
 

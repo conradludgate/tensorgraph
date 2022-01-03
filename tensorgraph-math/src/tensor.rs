@@ -53,8 +53,10 @@ impl<S: StorageMut, Dim: Dimension> ShareMut for Tensor<S, Dim> {
 }
 
 impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
+    /// Creates a new tensor using the shape and the raw data.
+    /// The length of the data structure must match the size of the dimensions
     pub fn from_shape(shape: Dim, data: S) -> Self {
-        assert_eq!(data.as_ref().len(), shape.len());
+        assert_eq!(data.as_ref().len(), shape.size());
         let strides = shape.column_major_strides();
         Self {
             shape,
@@ -63,10 +65,12 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
         }
     }
 
+    /// Consumes the tensor, returning the underlying data
     pub fn into_inner(self) -> S {
         self.data
     }
 
+    /// Reverses the axes of the tensor. An inplace transpose
     pub fn reverse_axes(&mut self) {
         self.shape.as_mut().reverse();
         self.strides.as_mut().reverse();
@@ -77,12 +81,16 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
         self.strides.as_mut().swap(i, j);
     }
 
-    pub fn t(&self) -> TensorView<S::T, S::Device, Dim> {
+    /// Returns a view of the tensor with the contents transposed.
+    /// This operation happens without mutating or cloning any data
+    pub fn t(&self) -> Tensor<&ViewOf<S>, Dim> {
         let mut view = self.share();
         view.reverse_axes();
         view
     }
 
+    /// Creates a new owned version of the tensor.
+    /// Will only clone the contents if needed
     pub fn into_owned(self) -> Tensor<S::Owned, Dim>
     where
         S: IntoOwned,
@@ -95,6 +103,7 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
         }
     }
 
+    /// Slices the tensor over a specific axis. The resulting tensor will be a dimension smaller
     pub fn slice_axis(&self, axis: usize, n: usize) -> TensorView<S::T, S::Device, Dim::Smaller>
     where
         Dim: RemoveDim,
@@ -114,16 +123,35 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
     }
 }
 
-pub type TensorView<'a, T, D, Dim> = Tensor<&'a Ref<[T], D>, Dim>;
-pub type TensorViewMut<'a, T, D, Dim> = Tensor<&'a mut Ref<[T], D>, Dim>;
+/// A representation of a slice
+pub type Slice<T, D> = Ref<[T], D>;
+
+/// Gets the view repr of the provided storage
+pub type ViewOf<S> = Slice<<S as Storage>::T, <S as Storage>::Device>;
+
+/// A 'view' of a tensor, Like `&[T]` is to `Vec<T>`
+pub type TensorView<'a, T, D, Dim> = Tensor<&'a Slice<T, D>, Dim>;
+
+/// A 'mut view' of a tensor, Like `&mut [T]` is to `Vec<T>`
+pub type TensorViewMut<'a, T, D, Dim> = Tensor<&'a mut Slice<T, D>, Dim>;
+
+/// An uninit tensor. Contents are mutable and specified as [`MaybeUninit`].
 pub type UninitTensor<'a, T, D, Dim> = TensorViewMut<'a, MaybeUninit<T>, D, Dim>;
 
+/// A 2-dimensional tensor
 pub type Matrix<S> = Tensor<S, [usize; 2]>;
-pub type MatrixView<'a, T, D> = Matrix<&'a Ref<[T], D>>;
-pub type MatrixViewMut<'a, T, D> = Matrix<&'a mut Ref<[T], D>>;
+
+/// A 'view' of a matrix, Like `&[T]` is to `Vec<T>`
+pub type MatrixView<'a, T, D> = Matrix<&'a Slice<T, D>>;
+
+/// A 'mut view' of a matrix, Like `&mut [T]` is to `Vec<T>`
+pub type MatrixViewMut<'a, T, D> = Matrix<&'a mut Slice<T, D>>;
+
+/// An uninit matrix. Contents are mutable and specified as [`MaybeUninit`].
 pub type UninitMatrix<'a, T, D> = MatrixViewMut<'a, MaybeUninit<T>, D>;
 
 impl<S: Storage> Matrix<S> {
+    /// Multiply two matricies together.
     pub fn dot(
         &self,
         rhs: Matrix<impl Storage<T = S::T, Device = S::Device>>,
@@ -136,6 +164,7 @@ impl<S: Storage> Matrix<S> {
         self.dot_using(rhs, Default::default())
     }
 
+    /// Multiply two matricies together, using the specified [`BLASContext`]
     pub fn dot_using<C: BLASContext<S::Device>>(
         &self,
         rhs: Matrix<impl Storage<T = S::T, Device = S::Device>>,
@@ -149,6 +178,7 @@ impl<S: Storage> Matrix<S> {
         self.dot_into(rhs, ctx, Default::default())
     }
 
+    /// Multiply two matricies together, using the provided [`DeviceAllocator`], using the specified [`BLASContext`]
     pub fn dot_into<C: BLASContext<S::Device>, A: DeviceAllocator<S::Device>>(
         &self,
         rhs: Matrix<impl Storage<T = S::T, Device = S::Device>>,
@@ -174,7 +204,7 @@ impl<S: Storage> Matrix<S> {
     }
 }
 
-impl<'a, T: Copy, D: Device, Dim: Dimension> UninitTensor<'a, T, D, Dim> {
+impl<'a, T, D: Device, Dim: Dimension> UninitTensor<'a, T, D, Dim> {
     /// # Safety
     /// Contents must be initialised
     pub unsafe fn assume_init(self) -> TensorViewMut<'a, T, D, Dim> {
@@ -186,7 +216,7 @@ impl<'a, T: Copy, D: Device, Dim: Dimension> UninitTensor<'a, T, D, Dim> {
     }
 }
 
-impl<'a, T: Copy, D: Device, Dim: Dimension> TensorView<'a, MaybeUninit<T>, D, Dim> {
+impl<'a, T, D: Device, Dim: Dimension> TensorView<'a, MaybeUninit<T>, D, Dim> {
     /// # Safety
     /// Contents must be initialised
     pub unsafe fn assume_init(self) -> TensorView<'a, T, D, Dim> {
@@ -198,6 +228,10 @@ impl<'a, T: Copy, D: Device, Dim: Dimension> TensorView<'a, MaybeUninit<T>, D, D
     }
 }
 
+/// Performs the basic matmul operation.
+/// C = alpha * A * B.
+///
+/// Uses the default [`BLASContext`] for the device.
 pub fn gemm_uninit<F: GEMM<D::Context, D> + Zero, D: DefaultBLASContext>(
     alpha: F,
     a: Matrix<impl Storage<T = F, Device = D>>,
@@ -207,6 +241,8 @@ pub fn gemm_uninit<F: GEMM<D::Context, D> + Zero, D: DefaultBLASContext>(
     gemm_uninit_ctx(D::Context::default(), alpha, a, b, c)
 }
 
+/// Performs the basic matmul operation.
+/// C = alpha * A * B.
 pub fn gemm_uninit_ctx<F: GEMM<C, D> + Zero, C: BLASContext<D>, D: Device>(
     ctx: C,
     alpha: F,
@@ -219,6 +255,10 @@ pub fn gemm_uninit_ctx<F: GEMM<C, D> + Zero, C: BLASContext<D>, D: Device>(
     unsafe { gemm_ctx(ctx, alpha, a, b, F::zero(), c.assume_init()) }
 }
 
+/// Performs the basic matmul operation.
+/// C = alpha * A * B + beta * C.
+///
+/// Uses the default [`BLASContext`] for the device.
 pub fn gemm<F: GEMM<D::Context, D> + Zero, D: DefaultBLASContext>(
     alpha: F,
     a: Matrix<impl Storage<T = F, Device = D>>,
@@ -229,6 +269,8 @@ pub fn gemm<F: GEMM<D::Context, D> + Zero, D: DefaultBLASContext>(
     gemm_ctx(D::Context::default(), alpha, a, b, beta, c)
 }
 
+/// Performs the basic matmul operation.
+/// C = alpha * A * B + beta * C.
 pub fn gemm_ctx<F: GEMM<C, D> + Zero, C: BLASContext<D>, D: Device>(
     ctx: C,
     alpha: F,
