@@ -25,7 +25,7 @@ impl<S: Storage, Dim: Dimension> View for Tensor<S, Dim> {
     type Ref<'a>
     where
         Self: 'a,
-    = TensorView<'a, S::T, S::Device, Dim>;
+    = Tensor<&'a ViewOf<S>, Dim>;
 
     fn view(&self) -> TensorView<S::T, S::Device, Dim> {
         Tensor {
@@ -40,7 +40,7 @@ impl<S: StorageMut, Dim: Dimension> ViewMut for Tensor<S, Dim> {
     type Mut<'a>
     where
         Self: 'a,
-    = TensorViewMut<'a, S::T, S::Device, Dim>;
+    = Tensor<&'a mut ViewOf<S>, Dim>;
 
     fn view_mut(&mut self) -> TensorViewMut<S::T, S::Device, Dim> {
         Tensor {
@@ -151,10 +151,7 @@ pub type UninitMatrix<'a, T, D> = MatrixViewMut<'a, MaybeUninit<T>, D>;
 
 impl<S: Storage> Matrix<S> {
     /// Multiply two matricies together.
-    pub fn dot(
-        &self,
-        rhs: Matrix<impl Storage<T = S::T, Device = S::Device>>,
-    ) -> Matrix<DefaultVec<S::T, S::Device>>
+    pub fn dot(&self, rhs: Matrix<&ViewOf<S>>) -> Matrix<DefaultVec<S::T, S::Device>>
     where
         S::T: Zero + One,
         S::Device: DefaultDeviceAllocator + DefaultBLASContext,
@@ -166,7 +163,7 @@ impl<S: Storage> Matrix<S> {
     /// Multiply two matricies together, using the specified [`BLASContext`]
     pub fn dot_using<C: BLASContext<S::Device>>(
         &self,
-        rhs: Matrix<impl Storage<T = S::T, Device = S::Device>>,
+        rhs: Matrix<&ViewOf<S>>,
         ctx: C,
     ) -> Matrix<DefaultVec<S::T, S::Device>>
     where
@@ -180,7 +177,7 @@ impl<S: Storage> Matrix<S> {
     /// Multiply two matricies together, using the provided [`DeviceAllocator`], using the specified [`BLASContext`]
     pub fn dot_into<C: BLASContext<S::Device>, A: DeviceAllocator<S::Device>>(
         &self,
-        rhs: Matrix<impl Storage<T = S::T, Device = S::Device>>,
+        rhs: Matrix<&ViewOf<S>>,
         ctx: C,
         alloc: A,
     ) -> Matrix<Vec<S::T, A, S::Device>>
@@ -330,7 +327,7 @@ fn lead(s: [usize; 2]) -> (MatrixOp, i32) {
 mod tests {
     use std::ops::Deref;
 
-    use tensorgraph_sys::{View, ViewMut, Vec};
+    use tensorgraph_sys::{Vec, View, ViewMut};
 
     use crate::tensor::{gemm, Tensor};
 
@@ -353,7 +350,7 @@ mod tests {
         // C = AB =  6 11
         //          10 19
 
-        let c = a.dot(b);
+        let c = a.dot(b.view());
         assert_eq!(c.into_inner().into_std(), [2., 6., 10., 3., 11., 19.]);
     }
 
@@ -385,7 +382,7 @@ mod tests {
         // C3 = A^B = 17 23
         //            39 53
 
-        let c3 = a.t().dot(b);
+        let c3 = a.t().dot(b.view());
         assert_eq!(c3.into_inner().into_std(), [17.0, 39.0, 23.0, 53.0]);
     }
 
