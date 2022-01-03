@@ -1,6 +1,6 @@
 [package]
 name = "tensorgraph-math"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "backbone for tensorgraph, providing math primitives"
 repository = "https://github.com/conradludgate/tensorgraph"
