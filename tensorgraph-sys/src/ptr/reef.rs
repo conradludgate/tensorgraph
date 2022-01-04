@@ -98,7 +98,7 @@ impl<T: Copy, D: Device> Ref<[MaybeUninit<T>], D> {
 }
 
 impl<T: Copy, D: DefaultDeviceAllocator> ToOwned for Ref<[T], D> {
-    type Owned = Vec<T, D::Alloc, D>;
+    type Owned = Vec<T, D, D::Alloc>;
 
     fn to_owned(&self) -> Self::Owned {
         unsafe {

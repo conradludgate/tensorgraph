@@ -57,7 +57,7 @@ impl<S: Storage> Matrix<S> {
         rhs: Matrix<&ViewOf<S>>,
         ctx: C,
         alloc: A,
-    ) -> Matrix<Vec<S::T, A, S::Device>>
+    ) -> Matrix<Vec<S::T, S::Device, A>>
     where
         S::T: Zero + One,
         S::T: GEMM<C, S::Device>,

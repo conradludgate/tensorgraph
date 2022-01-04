@@ -14,15 +14,15 @@ use crate::{
 
 /// Same as [`std::vec::Vec`] but using device allocators rather than host allocators.
 /// This allows you to have owned buffers on GPUs and CPUs using a single data structure.
-pub struct Vec<T, A: DeviceAllocator<D> = Global, D: Device = Cpu> {
-    buf: Box<[MaybeUninit<T>], A, D>,
+pub struct Vec<T, D: Device = Cpu, A: DeviceAllocator<D> = Global> {
+    buf: Box<[MaybeUninit<T>], D, A>,
     len: usize,
 }
 
 /// A [`Vec`] that uses the default allocator for the device
-pub type DefaultVec<T, D = Cpu> = Vec<T, <D as DefaultDeviceAllocator>::Alloc, D>;
+pub type DefaultVec<T, D = Cpu> = Vec<T, D, <D as DefaultDeviceAllocator>::Alloc>;
 
-impl<T, A: DeviceAllocator<D>, D: Device> Drop for Vec<T, A, D> {
+impl<T, D: Device, A: DeviceAllocator<D>> Drop for Vec<T, D, A> {
     fn drop(&mut self) {
         unsafe {
             // drop the data
@@ -42,7 +42,7 @@ impl<T, A: DeviceAllocator<D>, D: Device> Drop for Vec<T, A, D> {
     }
 }
 
-impl<T: Copy, A: DeviceAllocator<D> + Clone, D: Device> Clone for Vec<T, A, D> {
+impl<T: Copy, A: DeviceAllocator<D> + Clone, D: Device> Clone for Vec<T, D, A> {
     fn clone(&self) -> Self {
         let slice = self.deref();
         unsafe {
@@ -54,8 +54,8 @@ impl<T: Copy, A: DeviceAllocator<D> + Clone, D: Device> Clone for Vec<T, A, D> {
     }
 }
 
-impl<T, A: DeviceAllocator<D>, D: Device> Vec<T, A, D> {
-    pub fn from_box(b: Box<[T], A, D>) -> Self {
+impl<T, D: Device, A: DeviceAllocator<D>> Vec<T, D, A> {
+    pub fn from_box(b: Box<[T], D, A>) -> Self {
         let len = b.len();
         unsafe { Self::from_raw_parts(b.into_uninit(), len) }
     }
@@ -97,11 +97,11 @@ impl<T, A: DeviceAllocator<D>, D: Device> Vec<T, A, D> {
 
     /// # Safety
     /// `buf` must be a valid allocation in `device`, and `len` items must be initialised
-    pub unsafe fn from_raw_parts(buf: Box<[MaybeUninit<T>], A, D>, len: usize) -> Self {
+    pub unsafe fn from_raw_parts(buf: Box<[MaybeUninit<T>], D, A>, len: usize) -> Self {
         Self { buf, len }
     }
 
-    pub fn into_raw_parts(self) -> (Box<[MaybeUninit<T>], A, D>, usize) {
+    pub fn into_raw_parts(self) -> (Box<[MaybeUninit<T>], D, A>, usize) {
         let v = ManuallyDrop::new(self);
         unsafe { (std::ptr::read(&v.buf), v.len) }
     }
@@ -162,7 +162,7 @@ impl<T, A: DeviceAllocator<D>, D: Device> Vec<T, A, D> {
     }
 }
 
-impl<T, A: Allocator> From<std::vec::Vec<T, A>> for Vec<T, A> {
+impl<T, A: Allocator> From<std::vec::Vec<T, A>> for Vec<T, Cpu, A> {
     fn from(v: std::vec::Vec<T, A>) -> Self {
         unsafe {
             let (ptr, len, cap, alloc) = v.into_raw_parts_with_alloc();
@@ -174,8 +174,8 @@ impl<T, A: Allocator> From<std::vec::Vec<T, A>> for Vec<T, A> {
     }
 }
 
-impl<T, A: Allocator> From<Vec<T, A>> for std::vec::Vec<T, A> {
-    fn from(v: Vec<T, A>) -> Self {
+impl<T, A: Allocator> From<Vec<T, Cpu, A>> for std::vec::Vec<T, A> {
+    fn from(v: Vec<T, Cpu, A>) -> Self {
         unsafe {
             let (buf, len) = v.into_raw_parts();
             let (ptr, alloc) = buf.into_raw_parts();
@@ -185,13 +185,13 @@ impl<T, A: Allocator> From<Vec<T, A>> for std::vec::Vec<T, A> {
     }
 }
 
-impl<T, A: Allocator> Vec<T, A, Cpu> {
+impl<T, A: Allocator> Vec<T, Cpu, A> {
     pub fn into_std(self) -> std::vec::Vec<T, A> {
         self.into()
     }
 }
 
-impl<T, A: DeviceAllocator<D>, D: Device> Deref for Vec<T, A, D> {
+impl<T, D: Device, A: DeviceAllocator<D>> Deref for Vec<T, D, A> {
     type Target = Ref<[T], D>;
 
     fn deref(&self) -> &Self::Target {
@@ -199,37 +199,37 @@ impl<T, A: DeviceAllocator<D>, D: Device> Deref for Vec<T, A, D> {
     }
 }
 
-impl<T, A: DeviceAllocator<D>, D: Device> DerefMut for Vec<T, A, D> {
+impl<T, D: Device, A: DeviceAllocator<D>> DerefMut for Vec<T, D, A> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.buf.deref_mut()[..self.len].assume_init_mut() }
     }
 }
 
-impl<T, A: DeviceAllocator<D>, D: Device> Borrow<Ref<[T], D>> for Vec<T, A, D> {
+impl<T, D: Device, A: DeviceAllocator<D>> Borrow<Ref<[T], D>> for Vec<T, D, A> {
     fn borrow(&self) -> &Ref<[T], D> {
         self
     }
 }
 
-impl<T, A: DeviceAllocator<D>, D: Device> AsRef<Ref<[T], D>> for Vec<T, A, D> {
+impl<T, D: Device, A: DeviceAllocator<D>> AsRef<Ref<[T], D>> for Vec<T, D, A> {
     fn as_ref(&self) -> &Ref<[T], D> {
         self
     }
 }
 
-impl<T, A: DeviceAllocator<Cpu>> AsRef<[T]> for Vec<T, A, Cpu> {
+impl<T, A: DeviceAllocator<Cpu>> AsRef<[T]> for Vec<T, Cpu, A> {
     fn as_ref(&self) -> &[T] {
         self
     }
 }
 
-impl<T, A: DeviceAllocator<D>, D: Device> AsMut<Ref<[T], D>> for Vec<T, A, D> {
+impl<T, D: Device, A: DeviceAllocator<D>> AsMut<Ref<[T], D>> for Vec<T, D, A> {
     fn as_mut(&mut self) -> &mut Ref<[T], D> {
         self
     }
 }
 
-impl<T, A: DeviceAllocator<Cpu>> AsMut<[T]> for Vec<T, A, Cpu> {
+impl<T, A: DeviceAllocator<Cpu>> AsMut<[T]> for Vec<T, Cpu, A> {
     fn as_mut(&mut self) -> &mut [T] {
         self
     }

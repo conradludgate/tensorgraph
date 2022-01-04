@@ -3,7 +3,7 @@ use std::alloc::Allocator;
 use tensorgraph_sys::{
     device::{cpu::Cpu, DefaultDeviceAllocator, Device, DeviceAllocator},
     ptr::Ref,
-    Vec,
+    Vec, DefaultVec,
 };
 
 /// Convert a value into it's owned representation.
@@ -23,14 +23,14 @@ pub trait StorageMut: Storage + AsMut<Ref<[Self::T], Self::Device>> {}
 
 // Vec
 
-impl<T, A: DeviceAllocator<D>, D: Device> Storage for Vec<T, A, D> {
+impl<T, D: Device, A: DeviceAllocator<D>> Storage for Vec<T, D, A> {
     type T = T;
     type Device = D;
 }
 
-impl<T, A: DeviceAllocator<D>, D: Device> StorageMut for Vec<T, A, D> {}
+impl<T, D: Device, A: DeviceAllocator<D>> StorageMut for Vec<T, D, A> {}
 
-impl<T, A: DeviceAllocator<D>, D: Device> IntoOwned for Vec<T, A, D> {
+impl<T, D: Device, A: DeviceAllocator<D>> IntoOwned for Vec<T, D, A> {
     type Owned = Self;
     fn into_owned(self) -> Self::Owned {
         self
@@ -45,7 +45,7 @@ impl<'a, T, D: Device> Storage for &'a Ref<[T], D> {
 }
 
 impl<'a, T: Copy, D: DefaultDeviceAllocator> IntoOwned for &'a Ref<[T], D> {
-    type Owned = Vec<T, D::Alloc, D>;
+    type Owned = DefaultVec<T, D>;
     fn into_owned(self) -> Self::Owned {
         self.to_owned()
     }
@@ -61,7 +61,7 @@ impl<'a, T, D: Device> Storage for &'a mut Ref<[T], D> {
 impl<'a, T, D: Device> StorageMut for &'a mut Ref<[T], D> {}
 
 impl<'a, T: Copy, D: DefaultDeviceAllocator> IntoOwned for &'a mut Ref<[T], D> {
-    type Owned = Vec<T, D::Alloc, D>;
+    type Owned = DefaultVec<T, D>;
     fn into_owned(self) -> Self::Owned {
         self.to_owned()
     }
