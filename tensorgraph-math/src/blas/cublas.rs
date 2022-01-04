@@ -5,7 +5,7 @@ use rcublas_sys::{
     cublasStatus_t,
 };
 
-use tensorgraph_sys::device::cuda::{Cuda, CudaUnified, SharedStream};
+use tensorgraph_sys::device::cuda::{Cuda, CudaUnified, SharedStream, Unified};
 
 use super::{BLASContext, GEMM};
 
@@ -76,8 +76,13 @@ impl SharedCublasContext {
     }
 }
 
-impl<'a> BLASContext<Cuda> for &'a SharedCublasContext {}
-impl<'a> BLASContext<CudaUnified> for &'a SharedCublasContext {}
+impl<'a> BLASContext for &'a SharedCublasContext {
+    type Device = Cuda;
+}
+
+impl<'a> BLASContext for &'a Unified<SharedCublasContext> {
+    type Device = CudaUnified;
+}
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum CublasError {

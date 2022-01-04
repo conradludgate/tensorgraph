@@ -3,27 +3,27 @@ use std::{fmt::Debug, marker::PhantomData, ptr::Pointee};
 use crate::device::{Device, DevicePtr};
 
 /// Same as [`std::ptr::NonNull<T>`] but backed by a [`Device::Ptr`] instead of a raw pointer
-pub struct NonNull<T: ?Sized, D: Device + ?Sized> {
+pub struct NonNull<T: ?Sized, D: Device> {
     inner: std::ptr::NonNull<T>,
     _marker: PhantomData<D>,
 }
 
-impl<T: ?Sized, D: Device + ?Sized> Debug for NonNull<T, D> {
+impl<T: ?Sized, D: Device> Debug for NonNull<T, D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("NonNull").field(&self.inner).finish()
     }
 }
 
-impl<T: ?Sized, D: Device + ?Sized> Clone for NonNull<T, D> {
+impl<T: ?Sized, D: Device> Clone for NonNull<T, D> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T: ?Sized, D: Device + ?Sized> Copy for NonNull<T, D> {}
+impl<T: ?Sized, D: Device> Copy for NonNull<T, D> {}
 
-impl<T: ?Sized, D: Device + ?Sized> NonNull<T, D> {
+impl<T: ?Sized, D: Device> NonNull<T, D> {
     pub fn new(ptr: D::Ptr<T>) -> Option<Self> {
         let inner = std::ptr::NonNull::new(ptr.as_raw())?;
         Some(Self {
@@ -62,7 +62,7 @@ impl<T: ?Sized, D: Device + ?Sized> NonNull<T, D> {
     }
 }
 
-impl<T, D: Device + ?Sized> NonNull<[T], D> {
+impl<T, D: Device> NonNull<[T], D> {
     pub fn slice_from_raw_parts(data: NonNull<T, D>, len: usize) -> Self {
         let NonNull { inner, _marker } = data;
         let inner = std::ptr::NonNull::slice_from_raw_parts(inner, len);

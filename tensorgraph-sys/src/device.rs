@@ -9,7 +9,7 @@ pub mod cuda;
 
 /// Represents a physical device that can host memory.
 /// For example: [`cpu::Cpu`], [`cuda::Cuda`]
-pub trait Device {
+pub trait Device: Sized {
     #![allow(clippy::missing_safety_doc)]
 
     type Ptr<T: ?Sized>: DevicePtr<T>;
@@ -23,7 +23,7 @@ pub trait Device {
 /// Defines the default allocator for a device.
 /// For instance, The default allocator for [`cpu::Cpu`] is [`std::alloc::Global`]
 pub trait DefaultDeviceAllocator: Device {
-    type Alloc: DeviceAllocator<Self> + Default;
+    type Alloc: DeviceAllocator<Device = Self> + Default;
 }
 
 /// Represents a type safe device-based pointer.
@@ -75,36 +75,40 @@ pub trait DevicePtr<T: ?Sized>: Copy {
 
 /// An Allocator in a specific device.
 /// All [`std::alloc::Allocator`]s are [`DeviceAllocator<Device=cpu::Cpu>`]
-pub trait DeviceAllocator<D: Device + ?Sized> {
+pub trait DeviceAllocator {
     #![allow(clippy::missing_safety_doc)]
 
     /// Error returned when failing to allocate
     type AllocError: std::error::Error;
+    type Device: Device;
 
-    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8], D>, Self::AllocError>;
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
 
-    fn allocate_zeroed(&self, layout: Layout) -> Result<NonNull<[u8], D>, Self::AllocError>;
+    fn allocate_zeroed(
+        &self,
+        layout: Layout,
+    ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
 
-    unsafe fn deallocate(&self, ptr: NonNull<u8, D>, layout: Layout);
+    unsafe fn deallocate(&self, ptr: NonNull<u8, Self::Device>, layout: Layout);
 
     unsafe fn grow(
         &self,
-        ptr: NonNull<u8, D>,
+        ptr: NonNull<u8, Self::Device>,
         old_layout: Layout,
         new_layout: Layout,
-    ) -> Result<NonNull<[u8], D>, Self::AllocError>;
+    ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
 
     unsafe fn grow_zeroed(
         &self,
-        ptr: NonNull<u8, D>,
+        ptr: NonNull<u8, Self::Device>,
         old_layout: Layout,
         new_layout: Layout,
-    ) -> Result<NonNull<[u8], D>, Self::AllocError>;
+    ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
 
     unsafe fn shrink(
         &self,
-        ptr: NonNull<u8, D>,
+        ptr: NonNull<u8, Self::Device>,
         old_layout: Layout,
         new_layout: Layout,
-    ) -> Result<NonNull<[u8], D>, Self::AllocError>;
+    ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
 }

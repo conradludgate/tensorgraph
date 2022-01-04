@@ -9,7 +9,9 @@ mod blas_sys;
 #[cfg(feature = "matrixmultiply")]
 mod matmul;
 
-impl BLASContext<Cpu> for () {}
+impl BLASContext for () {
+    type Device = Cpu;
+}
 
 impl DefaultBLASContext for Cpu {
     type Context = ();

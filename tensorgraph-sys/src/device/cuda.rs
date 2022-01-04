@@ -17,7 +17,7 @@ mod unified;
 pub use context::{AttachedContext, Context, FloatingContext, SharedContext};
 pub use global::get_stream;
 pub use stream::{SharedStream, Stream};
-pub use unified::{CudaUnified, UnifiedAlloc};
+pub use unified::{CudaUnified, UnifiedAlloc, Unified};
 
 #[derive(Debug)]
 /// Device for CUDA enabled GPUs
@@ -105,8 +105,9 @@ impl SharedStream {
     }
 }
 
-impl<'a> DeviceAllocator<Cuda> for &'a SharedStream {
+impl<'a> DeviceAllocator for &'a SharedStream {
     type AllocError = CudaError;
+    type Device = Cuda;
 
     fn allocate(&self, layout: std::alloc::Layout) -> CudaResult<NonNull<[u8], Cuda>> {
         let size = layout.size();

@@ -1,7 +1,7 @@
 use rcublas_sys::{cublasDgemm_v2, cublasSgemm_v2};
 
 use tensorgraph_sys::device::{
-    cuda::{Cuda, CudaUnified},
+    cuda::{Cuda, Unified},
     Device,
 };
 
@@ -21,7 +21,7 @@ impl From<MatrixOp> for rcublas_sys::cublasOperation_t {
 
 type DevicePointer<T> = <Cuda as Device>::Ptr<T>;
 
-impl<'a> GEMM<&'a SharedCublasContext, Cuda> for f32 {
+impl<'a> GEMM<&'a SharedCublasContext> for f32 {
     unsafe fn gemm(
         handle: &SharedCublasContext,
         transa: MatrixOp,
@@ -59,7 +59,7 @@ impl<'a> GEMM<&'a SharedCublasContext, Cuda> for f32 {
     }
 }
 
-impl<'a> GEMM<&'a SharedCublasContext, Cuda> for f64 {
+impl<'a> GEMM<&'a SharedCublasContext> for f64 {
     unsafe fn gemm(
         handle: &SharedCublasContext,
         transa: MatrixOp,
@@ -97,9 +97,9 @@ impl<'a> GEMM<&'a SharedCublasContext, Cuda> for f64 {
     }
 }
 
-impl<'a> GEMM<&'a SharedCublasContext, CudaUnified> for f32 {
+impl<'a> GEMM<&'a Unified<SharedCublasContext>> for f32 {
     unsafe fn gemm(
-        handle: &SharedCublasContext,
+        handle: &Unified<SharedCublasContext>,
         transa: MatrixOp,
         transb: MatrixOp,
         m: i32,
@@ -135,9 +135,9 @@ impl<'a> GEMM<&'a SharedCublasContext, CudaUnified> for f32 {
     }
 }
 
-impl<'a> GEMM<&'a SharedCublasContext, CudaUnified> for f64 {
+impl<'a> GEMM<&'a Unified<SharedCublasContext>> for f64 {
     unsafe fn gemm(
-        handle: &SharedCublasContext,
+        handle: &Unified<SharedCublasContext>,
         transa: MatrixOp,
         transb: MatrixOp,
         m: i32,

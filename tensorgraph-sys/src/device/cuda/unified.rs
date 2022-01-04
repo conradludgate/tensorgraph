@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use std::{ffi::c_void, ops::{Deref, DerefMut}};
 
 use cust::error::{CudaError, CudaResult};
 use cust_raw::CUmemAttach_flags_enum;
@@ -69,8 +69,9 @@ impl DefaultDeviceAllocator for CudaUnified {
     type Alloc = UnifiedAlloc;
 }
 
-impl<'a> DeviceAllocator<CudaUnified> for UnifiedAlloc {
+impl<'a> DeviceAllocator for UnifiedAlloc {
     type AllocError = CudaError;
+    type Device = CudaUnified;
 
     fn allocate(&self, layout: std::alloc::Layout) -> CudaResult<NonNull<[u8], CudaUnified>> {
         let size = layout.size();
@@ -166,4 +167,46 @@ fn d_ptr2(ptr: *mut [u8]) -> cust_raw::CUdeviceptr {
 }
 fn d_ptr3(ptr: *mut u8) -> cust_raw::CUdeviceptr {
     ptr as cust_raw::CUdeviceptr
+}
+
+/// Newtype wrapper used in any unified contexts.
+#[repr(transparent)]
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Unified<T: ?Sized>(T);
+
+impl<T> From<T> for Unified<T> {
+    fn from(t: T) -> Self {
+        Self(t)
+    }
+}
+
+impl<'a, T: ?Sized> From<&'a T> for &'a Unified<T> {
+    fn from(t: &'a T) -> Self {
+        unsafe { &*(t as *const _ as *const _) }
+    }
+}
+
+impl<T: ?Sized> Deref for Unified<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<'a, T: ?Sized> From<&'a mut T> for &'a mut Unified<T> {
+    fn from(t: &'a mut T) -> Self {
+        unsafe { &mut *(t as *mut _ as *mut _) }
+    }
+}
+
+impl<T: ?Sized> DerefMut for Unified<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+impl<'a, T: ?Sized> Default for &'a Unified<T> where &'a T: Default {
+    fn default() -> Self {
+        <&'a T>::default().into()
+    }
 }
