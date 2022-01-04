@@ -6,26 +6,26 @@ use std::{
 };
 
 use crate::{
-    device::{cpu::Cpu, Device, DeviceAllocator, DevicePtr},
+    device::{DeviceAllocator, DevicePtr},
     ptr::{NonNull, Ref},
     zero::Zero,
 };
 
 /// Similar to [`std::boxed::Box`] but on device.
-pub struct Box<T: ?Sized, D: Device = Cpu, A: DeviceAllocator<D> = Global> {
-    pub(crate) ptr: NonNull<T, D>,
+pub struct Box<T: ?Sized, A: DeviceAllocator = Global> {
+    pub(crate) ptr: NonNull<T, A::Device>,
     alloc: A,
 
     _marker: PhantomData<T>,
 }
 
-impl<T: ?Sized, D: Device, A: DeviceAllocator<D>> Box<T, D, A> {
-    pub fn into_raw_parts(self) -> (NonNull<T, D>, A) {
+impl<T: ?Sized, A: DeviceAllocator> Box<T, A> {
+    pub fn into_raw_parts(self) -> (NonNull<T, A::Device>, A) {
         let b = std::mem::ManuallyDrop::new(self);
         (b.ptr, unsafe { std::ptr::read(&b.alloc) })
     }
 
-    pub unsafe fn from_raw_parts(ptr: NonNull<T, D>, alloc: A) -> Self {
+    pub unsafe fn from_raw_parts(ptr: NonNull<T, A::Device>, alloc: A) -> Self {
         Self {
             ptr,
             alloc,
@@ -37,7 +37,7 @@ impl<T: ?Sized, D: Device, A: DeviceAllocator<D>> Box<T, D, A> {
         &self.alloc
     }
 }
-impl<T: ?Sized, A: Allocator> Box<T, Cpu, A> {
+impl<T: ?Sized, A: Allocator> Box<T, A> {
     pub fn into_std(self) -> std::boxed::Box<T, A> {
         unsafe {
             let (ptr, alloc) = self.into_raw_parts();
@@ -46,21 +46,21 @@ impl<T: ?Sized, A: Allocator> Box<T, Cpu, A> {
     }
 }
 
-impl<T: ?Sized, D: Device, A: DeviceAllocator<D>> Deref for Box<T, D, A> {
-    type Target = Ref<T, D>;
+impl<T: ?Sized, A: DeviceAllocator> Deref for Box<T, A> {
+    type Target = Ref<T, A::Device>;
 
     fn deref(&self) -> &Self::Target {
         unsafe { Ref::from_ptr(self.ptr.as_ptr()) }
     }
 }
 
-impl<T, D: Device, A: DeviceAllocator<D>> DerefMut for Box<[T], D, A> {
+impl<T, A: DeviceAllocator> DerefMut for Box<[T], A> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { Ref::from_ptr_mut(self.ptr.as_ptr()) }
     }
 }
 
-impl<T, D: Device, A: DeviceAllocator<D>> Box<[MaybeUninit<T>], D, A> {
+impl<T, A: DeviceAllocator> Box<[MaybeUninit<T>], A> {
     /// # Safety
     /// If this resize results in a shrink, the data that is lost must be already dropped
     pub unsafe fn resize(&mut self, capacity: usize) {
@@ -106,7 +106,7 @@ impl<T, D: Device, A: DeviceAllocator<D>> Box<[MaybeUninit<T>], D, A> {
     }
 }
 
-impl<T, D: Device, A: DeviceAllocator<D>> Box<[T], D, A> {
+impl<T, A: DeviceAllocator> Box<[T], A> {
     pub fn zeroed(capacity: usize, alloc: A) -> Self
     where
         T: Zero,
@@ -119,7 +119,7 @@ impl<T, D: Device, A: DeviceAllocator<D>> Box<[T], D, A> {
         }
     }
 
-    pub fn into_uninit(self) -> Box<[MaybeUninit<T>], D, A> {
+    pub fn into_uninit(self) -> Box<[MaybeUninit<T>], A> {
         unsafe {
             let (ptr, alloc) = self.into_raw_parts();
             let (ptr, len) = ptr.to_raw_parts();
@@ -129,7 +129,7 @@ impl<T, D: Device, A: DeviceAllocator<D>> Box<[T], D, A> {
     }
 }
 
-impl<T: ?Sized, D: Device, A: DeviceAllocator<D>> Drop for Box<T, D, A> {
+impl<T: ?Sized, A: DeviceAllocator> Drop for Box<T, A> {
     fn drop(&mut self) {
         unsafe {
             let _ref = &*(self.ptr.as_ptr().as_raw());

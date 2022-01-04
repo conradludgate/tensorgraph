@@ -15,7 +15,7 @@ pub enum MatrixOp {
 }
 
 /// A context needed for running BLAS operations
-pub trait BLASContext<D: Device + ?Sized>: Clone {}
+pub trait BLASContext<D: Device>: Clone {}
 
 /// The default blas context for a device
 pub trait DefaultBLASContext: Device {

@@ -23,14 +23,14 @@ pub trait StorageMut: Storage + AsMut<Ref<[Self::T], Self::Device>> {}
 
 // Vec
 
-impl<T, D: Device, A: DeviceAllocator<D>> Storage for Vec<T, D, A> {
+impl<T, A: DeviceAllocator> Storage for Vec<T, A> {
     type T = T;
-    type Device = D;
+    type Device = A::Device;
 }
 
-impl<T, D: Device, A: DeviceAllocator<D>> StorageMut for Vec<T, D, A> {}
+impl<T, A: DeviceAllocator> StorageMut for Vec<T, A> {}
 
-impl<T, D: Device, A: DeviceAllocator<D>> IntoOwned for Vec<T, D, A> {
+impl<T, A: DeviceAllocator> IntoOwned for Vec<T, A> {
     type Owned = Self;
     fn into_owned(self) -> Self::Owned {
         self

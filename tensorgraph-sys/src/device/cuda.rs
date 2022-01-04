@@ -105,8 +105,9 @@ impl SharedStream {
     }
 }
 
-impl<'a> DeviceAllocator<Cuda> for &'a SharedStream {
+impl<'a> DeviceAllocator for &'a SharedStream {
     type AllocError = CudaError;
+    type Device = Cuda;
 
     fn allocate(&self, layout: std::alloc::Layout) -> CudaResult<NonNull<[u8], Cuda>> {
         let size = layout.size();

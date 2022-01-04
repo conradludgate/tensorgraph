@@ -13,7 +13,7 @@ use crate::{
 /// A reference type for devices. Should have the same representation as `&T` but
 /// is not safely transmutable. Device references can not be read directly safely since
 /// the host is not guaranteed to be on that device.
-pub struct Ref<T: ?Sized, D: Device + ?Sized> {
+pub struct Ref<T: ?Sized, D: Device> {
     _device: PhantomData<D>,
     inner: T,
 }
@@ -98,7 +98,7 @@ impl<T: Copy, D: Device> Ref<[MaybeUninit<T>], D> {
 }
 
 impl<T: Copy, D: DefaultDeviceAllocator> ToOwned for Ref<[T], D> {
-    type Owned = Vec<T, D, D::Alloc>;
+    type Owned = Vec<T, D::Alloc>;
 
     fn to_owned(&self) -> Self::Owned {
         unsafe {

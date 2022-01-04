@@ -69,8 +69,9 @@ impl DefaultDeviceAllocator for CudaUnified {
     type Alloc = UnifiedAlloc;
 }
 
-impl<'a> DeviceAllocator<CudaUnified> for UnifiedAlloc {
+impl<'a> DeviceAllocator for UnifiedAlloc {
     type AllocError = CudaError;
+    type Device = CudaUnified;
 
     fn allocate(&self, layout: std::alloc::Layout) -> CudaResult<NonNull<[u8], CudaUnified>> {
         let size = layout.size();

@@ -52,12 +52,12 @@ impl<S: Storage> Matrix<S> {
     }
 
     /// Multiply two matricies together, using the provided [`DeviceAllocator`], using the specified [`BLASContext`]
-    pub fn dot_into<C: BLASContext<S::Device>, A: DeviceAllocator<S::Device>>(
+    pub fn dot_into<C: BLASContext<S::Device>, A: DeviceAllocator<Device = S::Device>>(
         &self,
         rhs: Matrix<&ViewOf<S>>,
         ctx: C,
         alloc: A,
-    ) -> Matrix<Vec<S::T, S::Device, A>>
+    ) -> Matrix<Vec<S::T, A>>
     where
         S::T: Zero + One,
         S::T: GEMM<C, S::Device>,
