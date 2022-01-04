@@ -3,7 +3,7 @@ use std::alloc::Allocator;
 use tensorgraph_sys::{
     device::{cpu::Cpu, DefaultDeviceAllocator, Device, DeviceAllocator},
     ptr::Ref,
-    Vec, DefaultVec,
+    DefaultVec, Vec,
 };
 
 /// Convert a value into it's owned representation.

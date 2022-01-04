@@ -11,13 +11,13 @@ impl GEMM<()> for f32 {
         m: i32,
         n: i32,
         k: i32,
-        alpha: f32,
-        a: *mut f32,
+        alpha: Self,
+        a: *mut Self,
         lda: i32,
-        b: *mut f32,
+        b: *mut Self,
         ldb: i32,
-        beta: f32,
-        c: *mut f32,
+        beta: Self,
+        c: *mut Self,
         ldc: i32,
     ) {
         blas_sys::sgemm_(
@@ -34,7 +34,7 @@ impl GEMM<()> for f32 {
             &beta,
             c,
             &ldc,
-        )
+        );
     }
 }
 
@@ -46,13 +46,13 @@ impl GEMM<()> for f64 {
         m: i32,
         n: i32,
         k: i32,
-        alpha: f64,
-        a: *mut f64,
+        alpha: Self,
+        a: *mut Self,
         lda: i32,
-        b: *mut f64,
+        b: *mut Self,
         ldb: i32,
-        beta: f64,
-        c: *mut f64,
+        beta: Self,
+        c: *mut Self,
         ldc: i32,
     ) {
         blas_sys::dgemm_(
@@ -69,6 +69,6 @@ impl GEMM<()> for f64 {
             &beta,
             c,
             &ldc,
-        )
+        );
     }
 }

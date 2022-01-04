@@ -16,10 +16,14 @@ pub struct AttachedContext<'a> {
 }
 
 impl<'a> AttachedContext<'a> {
+    /// Attaches to the context
+    ///
+    /// # Errors
+    /// If attaching to the context is not possible
     pub fn attach_to(ctx: &'a SharedContext) -> CudaResult<Self> {
         let mut ptr = ctx as *const _ as *mut _;
         unsafe {
-            cust_raw::cuCtxAttach(&mut ptr, 0).to_cuda_result().unwrap();
+            cust_raw::cuCtxAttach(&mut ptr, 0).to_cuda_result()?;
 
             Ok(Self {
                 inner: &*(ptr as *const _),
@@ -49,6 +53,10 @@ impl Context {
     /// Shortcut for initializing the CUDA Driver API and creating a CUDA context with default settings
     /// for the first device.
     #[must_use = "The CUDA Context must be kept alive or errors will be issued for any CUDA function that is run"]
+    /// Creates a new cuda context. Cuda must be initialised, see [`cust::init`].
+    ///
+    /// # Errors
+    /// If cuda fails to return a context
     pub fn new(device: cust::device::Device) -> CudaResult<Self> {
         unsafe {
             let mut ctx: CUcontext = std::ptr::null_mut();
@@ -60,15 +68,24 @@ impl Context {
         }
     }
 
+    /// Initialises the cuda context on the default device.
+    ///
+    /// # Errors
+    /// If cuda fails to return a context
     pub fn quick_init() -> CudaResult<Self> {
         cust::init(CudaFlags::empty())?;
         Self::new(cust::device::Device::get_device(0)?)
     }
 
+    #[must_use]
+    /// Pops the context from the current thread-stack.
+    ///
+    /// # Panics
+    /// If the context cannot be popped
     pub fn pop(self) -> FloatingContext {
-        let _self = ManuallyDrop::new(self);
+        let this = ManuallyDrop::new(self);
         unsafe {
-            let mut ptr = _self.inner.as_ptr();
+            let mut ptr = this.inner.as_ptr();
             cust_raw::cuCtxPopCurrent_v2(&mut ptr as *mut CUcontext)
                 .to_cuda_result()
                 .unwrap();
@@ -101,6 +118,10 @@ impl Drop for Context {
 pub struct SharedContext(cust_raw::CUctx_st);
 
 impl SharedContext {
+    /// Attaches to the context
+    ///
+    /// # Errors
+    /// If attaching to the context is not possible
     pub fn attach(&self) -> CudaResult<AttachedContext> {
         AttachedContext::attach_to(self)
     }
@@ -111,11 +132,16 @@ pub struct FloatingContext {
 }
 
 impl FloatingContext {
+    #[must_use]
+    /// Pushes the context onto the current thread stack
+    ///
+    /// # Panics
+    /// If cuda returns an error
     pub fn push(self) -> Context {
-        let _self = ManuallyDrop::new(self);
+        let this = ManuallyDrop::new(self);
         unsafe {
-            let ptr = _self.inner.as_ptr();
-            cust_raw::cuCtxPushCurrent_v2(ptr as CUcontext)
+            let ptr = this.inner.as_ptr();
+            cust_raw::cuCtxPushCurrent_v2(ptr.cast())
                 .to_cuda_result()
                 .unwrap();
             Context {

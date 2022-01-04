@@ -82,8 +82,16 @@ pub trait DeviceAllocator {
     type AllocError: std::error::Error;
     type Device: Device;
 
+    /// Create a new allocation
+    ///
+    /// # Errors
+    /// If the device fails, is not ready, or the allocation was invalid
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
 
+    /// Create a new allocation with zeroes
+    ///
+    /// # Errors
+    /// If the device fails, is not ready, or the allocation was invalid
     fn allocate_zeroed(
         &self,
         layout: Layout,
@@ -91,6 +99,10 @@ pub trait DeviceAllocator {
 
     unsafe fn deallocate(&self, ptr: NonNull<u8, Self::Device>, layout: Layout);
 
+    /// Grows an allocation
+    ///
+    /// # Errors
+    /// If the device fails, is not ready, or the allocation was invalid
     unsafe fn grow(
         &self,
         ptr: NonNull<u8, Self::Device>,
@@ -98,6 +110,10 @@ pub trait DeviceAllocator {
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
 
+    /// Grows an allocation with zeroes
+    ///
+    /// # Errors
+    /// If the device fails, is not ready, or the allocation was invalid
     unsafe fn grow_zeroed(
         &self,
         ptr: NonNull<u8, Self::Device>,
@@ -105,6 +121,10 @@ pub trait DeviceAllocator {
         new_layout: Layout,
     ) -> Result<NonNull<[u8], Self::Device>, Self::AllocError>;
 
+    /// Shrinks an allocation
+    ///
+    /// # Errors
+    /// If the device fails, is not ready, or the allocation was invalid
     unsafe fn shrink(
         &self,
         ptr: NonNull<u8, Self::Device>,

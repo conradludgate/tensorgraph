@@ -13,6 +13,7 @@ static GLOBAL: Lazy<RefCell<Option<std::ptr::NonNull<cublasContext>>>> =
 
 impl SharedCublasContext {
     /// Sets the cublas context as the global thread-local context
+    #[must_use]
     pub fn as_global(&self) -> CublasContextHandle {
         CublasContextHandle(GLOBAL.replace(Some(unsafe {
             std::ptr::NonNull::new_unchecked(self.handle())
@@ -29,6 +30,7 @@ impl Drop for CublasContextHandle {
 }
 
 /// Get the global stream set via [`SharedCublasContext::as_global`]
+#[must_use]
 pub fn get_cublas() -> Option<&'static SharedCublasContext> {
     GLOBAL
         .borrow()

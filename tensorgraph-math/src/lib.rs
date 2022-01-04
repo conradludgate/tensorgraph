@@ -171,6 +171,14 @@
 //! }
 //! ```
 
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::float_cmp,
+    clippy::many_single_char_names,
+    clippy::similar_names,
+    clippy::unreadable_literal
+)]
 #![allow(incomplete_features)]
 #![feature(
     generic_associated_types,
@@ -186,7 +194,6 @@
     layout_for_ptr
 )]
 
-/// Re-export of tensorgraph_sys.
 pub use tensorgraph_sys as sys;
 
 /// Traits and implementations of BLAS providers

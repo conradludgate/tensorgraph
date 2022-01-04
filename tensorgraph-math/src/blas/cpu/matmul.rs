@@ -2,6 +2,7 @@ use matrixmultiply::{dgemm, sgemm};
 
 use crate::blas::{MatrixOp, GEMM};
 
+#[allow(clippy::cast_sign_loss)]
 impl GEMM<()> for f32 {
     unsafe fn gemm(
         _ctx: (),
@@ -10,13 +11,13 @@ impl GEMM<()> for f32 {
         m: i32,
         n: i32,
         k: i32,
-        alpha: f32,
-        a: *mut f32,
+        alpha: Self,
+        a: *mut Self,
         lda: i32,
-        b: *mut f32,
+        b: *mut Self,
         ldb: i32,
-        beta: f32,
-        c: *mut f32,
+        beta: Self,
+        c: *mut Self,
         ldc: i32,
     ) {
         let mut sa = [1, lda as isize];
@@ -39,10 +40,11 @@ impl GEMM<()> for f32 {
         sgemm(
             m as usize, k as usize, n as usize, alpha, a, sa[0], sa[1], b, sb[0], sb[1], beta, c,
             sc[0], sc[1],
-        )
+        );
     }
 }
 
+#[allow(clippy::cast_sign_loss)]
 impl GEMM<()> for f64 {
     unsafe fn gemm(
         _ctx: (),
@@ -51,13 +53,13 @@ impl GEMM<()> for f64 {
         m: i32,
         n: i32,
         k: i32,
-        alpha: f64,
-        a: *mut f64,
+        alpha: Self,
+        a: *mut Self,
         lda: i32,
-        b: *mut f64,
+        b: *mut Self,
         ldb: i32,
-        beta: f64,
-        c: *mut f64,
+        beta: Self,
+        c: *mut Self,
         ldc: i32,
     ) {
         let mut sa = [1, lda as isize];
@@ -80,6 +82,6 @@ impl GEMM<()> for f64 {
         dgemm(
             m as usize, k as usize, n as usize, alpha, a, sa[0], sa[1], b, sb[0], sb[1], beta, c,
             sc[0], sc[1],
-        )
+        );
     }
 }

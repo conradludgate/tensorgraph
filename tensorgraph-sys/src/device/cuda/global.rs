@@ -12,6 +12,7 @@ static GLOBAL: Lazy<RefCell<Option<std::ptr::NonNull<CUstream_st>>>> =
 
 impl SharedStream {
     /// Sets the stream as the global thread-local stream
+    #[must_use]
     pub fn as_global(&self) -> StreamHandle {
         StreamHandle(GLOBAL.replace(Some(unsafe {
             std::ptr::NonNull::new_unchecked(self.inner())
@@ -28,6 +29,7 @@ impl Drop for StreamHandle {
 }
 
 /// Get the global stream set via [`SharedStream::as_global`]
+#[must_use]
 pub fn get_stream() -> Option<&'static SharedStream> {
     GLOBAL
         .borrow()

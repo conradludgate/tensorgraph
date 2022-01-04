@@ -69,15 +69,15 @@ impl<'a, T, D: Device> Ref<[MaybeUninit<T>], D> {
 
 impl<T: Copy, D: Device> Ref<[T], D> {
     pub fn copy_from_slice(&mut self, from: &Self) {
-        D::copy(from, self)
+        D::copy(from, self);
     }
 
     pub fn copy_from_host(&mut self, from: &[T]) {
-        D::copy_from_host(from, self)
+        D::copy_from_host(from, self);
     }
 
     pub fn copy_to_host(&self, to: &mut [T]) {
-        D::copy_to_host(self, to)
+        D::copy_to_host(self, to);
     }
 }
 
@@ -85,14 +85,14 @@ impl<T: Copy, D: Device> Ref<[MaybeUninit<T>], D> {
     pub fn init_from_slice(&mut self, from: &Ref<[T], D>) {
         unsafe {
             let ptr = self as *mut _ as *mut Ref<[T], D>;
-            (*ptr).copy_from_slice(from)
+            (*ptr).copy_from_slice(from);
         }
     }
 
     pub fn init_from_host(&mut self, from: &[T]) {
         unsafe {
             let ptr = self as *mut _ as *mut Ref<[T], D>;
-            (*ptr).copy_from_host(from)
+            (*ptr).copy_from_host(from);
         }
     }
 }

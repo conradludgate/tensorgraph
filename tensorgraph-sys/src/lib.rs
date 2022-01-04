@@ -12,6 +12,13 @@
     once_cell,
     layout_for_ptr
 )]
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::float_cmp,
+    clippy::many_single_char_names,
+    clippy::similar_names
+)]
 
 pub mod boxed;
 pub mod device;

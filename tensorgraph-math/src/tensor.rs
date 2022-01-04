@@ -1,9 +1,6 @@
 use std::mem::MaybeUninit;
 
-use tensorgraph_sys::{
-    ptr::Ref,
-    View, ViewMut,
-};
+use tensorgraph_sys::{ptr::Ref, View, ViewMut};
 
 use crate::{
     dims::{Dimension, RemoveDim},
@@ -29,6 +26,7 @@ pub type TensorViewMut<'a, T, D, Dim> = Tensor<&'a mut Slice<T, D>, Dim>;
 pub type UninitTensor<'a, T, D, Dim> = TensorViewMut<'a, MaybeUninit<T>, D, Dim>;
 
 /// A multidimensional data structure not unlike [`ndarray::ArrayBase`](https://docs.rs/ndarray/0.15.4/ndarray/struct.ArrayBase.html).
+#[derive(Copy, Clone)]
 pub struct Tensor<S: Storage, Dim: Dimension> {
     shape: Dim,
     strides: Dim,
@@ -67,6 +65,8 @@ impl<S: StorageMut, Dim: Dimension> ViewMut for Tensor<S, Dim> {
 
 impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
     /// Creates a new tensor using the shape and the raw data.
+    ///
+    /// # Panics
     /// The length of the data structure must match the size of the dimensions
     pub fn from_shape(shape: Dim, data: S) -> Self {
         assert_eq!(data.as_ref().len(), shape.size());
@@ -117,6 +117,9 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
     }
 
     /// Slices the tensor over a specific axis. The resulting tensor will be a dimension smaller
+    ///
+    /// # Panics
+    /// If the axis is outside of the length of the dimensions
     pub fn slice_axis(&self, axis: usize, n: usize) -> Tensor<&ViewOf<S>, Dim::Smaller>
     where
         Dim: RemoveDim,
@@ -138,9 +141,7 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Deref;
-
-    use tensorgraph_sys::{Vec, View, ViewMut};
+    use tensorgraph_sys::{View, ViewMut};
 
     use crate::tensor::{gemm, Tensor};
 
@@ -210,28 +211,28 @@ mod tests {
 
         // axis 0 (columns)
         let a00 = a.slice_axis(0, 0);
-        assert_eq!(a00.data.deref(), [0., 1., 2., 3., 4., 5.]); // represents 0, 2, 4
+        assert_eq!(&**a00.into_inner(), [0., 1., 2., 3., 4., 5.]); // represents 0, 2, 4
         assert_eq!(a00.shape, [3]);
         assert_eq!(a00.strides, [2]);
 
         let a01 = a.slice_axis(0, 1);
-        assert_eq!(a01.data.deref(), [1., 2., 3., 4., 5.]); // represents 1, 3, 5
+        assert_eq!(&**a01.into_inner(), [1., 2., 3., 4., 5.]); // represents 1, 3, 5
         assert_eq!(a01.shape, [3]);
         assert_eq!(a01.strides, [2]);
 
         // axis 1 (rows)
         let a10 = a.slice_axis(1, 0);
-        assert_eq!(a10.data.deref(), [0., 1., 2., 3., 4., 5.]); // represents 0, 1
+        assert_eq!(&**a10.into_inner(), [0., 1., 2., 3., 4., 5.]); // represents 0, 1
         assert_eq!(a10.shape, [2]);
         assert_eq!(a10.strides, [1]);
 
         let a11 = a.slice_axis(1, 1);
-        assert_eq!(a11.data.deref(), [2., 3., 4., 5.]); // represents 2, 3
+        assert_eq!(&**a11.into_inner(), [2., 3., 4., 5.]); // represents 2, 3
         assert_eq!(a11.shape, [2]);
         assert_eq!(a11.strides, [1]);
 
         let a12 = a.slice_axis(1, 2);
-        assert_eq!(a12.data.deref(), [4., 5.]); // represents 4, 5
+        assert_eq!(&**a12.into_inner(), [4., 5.]); // represents 4, 5
         assert_eq!(a12.shape, [2]);
         assert_eq!(a12.strides, [1]);
     }
@@ -240,11 +241,14 @@ mod tests {
     #[cfg(feature = "cublas")]
     fn matmul_cuda() {
         use crate::blas::cublas::CublasContext;
-        use tensorgraph_sys::device::cuda::{Context, Stream};
+        use tensorgraph_sys::{
+            device::cuda::{Context, Stream},
+            Vec,
+        };
 
         let ctx = Context::quick_init().unwrap();
         let cuda = Stream::new(&ctx).unwrap();
-        let cuda = cuda.deref();
+        let cuda = &*cuda;
 
         // column major
         let a = Vec::copy_from_host_in(&[0., 2., 4., 1., 3., 5.], cuda);
@@ -329,11 +333,14 @@ mod tests {
     #[cfg(feature = "cublas")]
     fn matmul_cuda2() {
         use crate::{blas::cublas::CublasContext, tensor::gemm_ctx};
-        use tensorgraph_sys::device::cuda::{Context, Stream};
+        use tensorgraph_sys::{
+            device::cuda::{Context, Stream},
+            Vec,
+        };
 
         let ctx = Context::quick_init().unwrap();
         let cuda = Stream::new(&ctx).unwrap();
-        let cuda = cuda.deref();
+        let cuda = &*cuda;
 
         // column major
         let a = Vec::copy_from_host_in(&[0.001, 1.0, 1.0, 0.], cuda);

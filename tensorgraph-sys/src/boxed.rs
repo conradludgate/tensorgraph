@@ -16,6 +16,7 @@ pub struct Box<T: ?Sized, A: DeviceAllocator = Global> {
     pub(crate) ptr: NonNull<T, A::Device>,
     alloc: A,
 
+    /// signifies that Box owns the T
     _marker: PhantomData<T>,
 }
 
@@ -25,6 +26,8 @@ impl<T: ?Sized, A: DeviceAllocator> Box<T, A> {
         (b.ptr, unsafe { std::ptr::read(&b.alloc) })
     }
 
+    /// # Safety
+    /// Pointer must be a valid allocation within `alloc`
     pub unsafe fn from_raw_parts(ptr: NonNull<T, A::Device>, alloc: A) -> Self {
         Self {
             ptr,
@@ -63,6 +66,9 @@ impl<T, A: DeviceAllocator> DerefMut for Box<[T], A> {
 impl<T, A: DeviceAllocator> Box<[MaybeUninit<T>], A> {
     /// # Safety
     /// If this resize results in a shrink, the data that is lost must be already dropped
+    ///
+    /// # Panics
+    /// If the allocations cannot be resized
     pub unsafe fn resize(&mut self, capacity: usize) {
         let new = capacity;
         let old = self.len();
@@ -88,6 +94,10 @@ impl<T, A: DeviceAllocator> Box<[MaybeUninit<T>], A> {
         self.ptr = NonNull::slice_from_raw_parts(data, new);
     }
 
+    #[must_use]
+    /// Creates a new uninit slice with the given capacity
+    /// # Panics
+    /// If the allocation cannot be created
     pub fn with_capacity(capacity: usize, alloc: A) -> Self {
         unsafe {
             let (layout, _) = Layout::new::<T>().repeat(capacity).unwrap();
@@ -96,17 +106,13 @@ impl<T, A: DeviceAllocator> Box<[MaybeUninit<T>], A> {
             Self::from_raw_parts(buf, alloc)
         }
     }
-    pub fn zeroed_uninit(capacity: usize, alloc: A) -> Self {
-        unsafe {
-            let (layout, _) = Layout::new::<T>().repeat(capacity).unwrap();
-            let data = alloc.allocate_zeroed(layout).unwrap().cast();
-            let buf = NonNull::slice_from_raw_parts(data, capacity);
-            Self::from_raw_parts(buf, alloc)
-        }
-    }
 }
 
 impl<T, A: DeviceAllocator> Box<[T], A> {
+    #[must_use]
+    /// Creates a new zeroed slice with the given capacity
+    /// # Panics
+    /// If the allocation cannot be created
     pub fn zeroed(capacity: usize, alloc: A) -> Self
     where
         T: Zero,
@@ -132,11 +138,11 @@ impl<T, A: DeviceAllocator> Box<[T], A> {
 impl<T: ?Sized, A: DeviceAllocator> Drop for Box<T, A> {
     fn drop(&mut self) {
         unsafe {
-            let _ref = &*(self.ptr.as_ptr().as_raw());
-            let size = size_of_val(_ref);
-            let align = align_of_val(_ref);
+            let ref_ = &*(self.ptr.as_ptr().as_raw());
+            let size = size_of_val(ref_);
+            let align = align_of_val(ref_);
             let layout = Layout::from_size_align_unchecked(size, align);
-            self.alloc.deallocate(self.ptr.cast(), layout)
+            self.alloc.deallocate(self.ptr.cast(), layout);
         }
     }
 }

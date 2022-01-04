@@ -18,6 +18,11 @@ pub struct CublasContext {
 }
 
 impl CublasContext {
+    /// Creates a new cublas context.
+    ///
+    /// # Panics
+    /// If cublas can't create a new context
+    #[must_use]
     pub fn new() -> Self {
         unsafe {
             let mut handle = std::ptr::null_mut();
@@ -29,13 +34,20 @@ impl CublasContext {
         }
     }
 
+    /// Sets the stream for the cublas context.
+    ///
+    /// # Panics
+    /// If cuda returns an error when configuring
+    #[must_use]
     pub fn with_stream<'a>(&'a self, stream: Option<&'a SharedStream>) -> &'a SharedCublasContext {
         unsafe {
             let ptr = self.inner.as_ptr();
 
             cublasSetStream_v2(
-                ptr as *mut _,
-                stream.map_or_else(std::ptr::null_mut, SharedStream::inner) as *mut _,
+                ptr.cast(),
+                stream
+                    .map_or_else(std::ptr::null_mut, SharedStream::inner)
+                    .cast(),
             )
             .to_cublas_result()
             .unwrap();
@@ -56,7 +68,7 @@ impl Drop for CublasContext {
         unsafe {
             cublasDestroy_v2(self.inner.as_ptr())
                 .to_cublas_result()
-                .unwrap()
+                .unwrap();
         }
     }
 }
@@ -64,14 +76,14 @@ impl Drop for CublasContext {
 impl Deref for CublasContext {
     type Target = SharedCublasContext;
     fn deref(&self) -> &SharedCublasContext {
-        unsafe { &*(self.inner.as_ptr() as *mut _) }
+        unsafe { &*(self.inner.as_ptr().cast()) }
     }
 }
 
 pub struct SharedCublasContext(cublasContext);
 
 impl SharedCublasContext {
-    fn handle(&self) -> cublasHandle_t {
+    const fn handle(&self) -> cublasHandle_t {
         self as *const _ as *mut _
     }
 }
@@ -105,6 +117,7 @@ pub(crate) trait ToCublasResult {
 }
 impl ToCublasResult for cublasStatus_t {
     fn to_cublas_result(self) -> CublasResult<()> {
+        #[allow(clippy::enum_glob_use)]
         use cublasStatus_t::*;
         match self {
             CUBLAS_STATUS_SUCCESS => Ok(()),

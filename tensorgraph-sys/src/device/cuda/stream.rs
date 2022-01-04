@@ -13,6 +13,9 @@ pub struct Stream<'ctx> {
 
 impl<'ctx> Stream<'ctx> {
     /// Create a new CUDA Stream
+    ///
+    /// # Errors
+    /// If the cuda stream could not be created
     pub fn new(_ctx: &'ctx SharedContext) -> CudaResult<Self> {
         let mut stream = std::ptr::null_mut();
 
@@ -44,11 +47,12 @@ impl<'ctx> Drop for Stream<'ctx> {
 }
 
 /// A Shared CUDA Stream. Created through [`Deref`] from [`Stream`].
-/// Is a DeviceAllocator for Cuda
+/// Is a [`DeviceAllocator`] for Cuda
 pub struct SharedStream(CUstream_st);
 
 impl SharedStream {
-    pub fn inner(&self) -> CUstream {
+    #[must_use]
+    pub const fn inner(&self) -> CUstream {
         self as *const _ as *mut _
     }
 }

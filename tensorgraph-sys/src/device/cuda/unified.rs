@@ -1,4 +1,7 @@
-use std::{ffi::c_void, ops::{Deref, DerefMut}};
+use std::{
+    ffi::c_void,
+    ops::{Deref, DerefMut},
+};
 
 use cust::error::{CudaError, CudaResult};
 use cust_raw::CUmemAttach_flags_enum;
@@ -22,8 +25,8 @@ impl Device for CudaUnified {
         // These slices had to be made using unsafe functions. Those should ensure that these pointers are valid.
         unsafe {
             cust_raw::cuMemcpyHtoD_v2(
-                to.as_slice_ptr() as *mut u8 as u64,
-                from.as_ptr() as *const c_void,
+                to.as_slice_ptr().cast::<u8>() as u64,
+                from.as_ptr().cast(),
                 std::mem::size_of::<T>() * from.len(),
             )
             .to_cuda_result()
@@ -37,8 +40,8 @@ impl Device for CudaUnified {
         // These slices had to be made using unsafe functions. Those should ensure that these pointers are valid.
         unsafe {
             cust_raw::cuMemcpyDtoH_v2(
-                to.as_mut_ptr() as *mut c_void,
-                from.as_slice_ptr() as *mut u8 as u64,
+                to.as_mut_ptr().cast(),
+                from.as_slice_ptr().cast::<u8>() as u64,
                 std::mem::size_of::<T>() * from.len(),
             )
             .to_cuda_result()
@@ -52,8 +55,8 @@ impl Device for CudaUnified {
         // These slices had to be made using unsafe functions. Those should ensure that these pointers are valid.
         unsafe {
             cust_raw::cuMemcpy(
-                to.as_slice_ptr() as *mut u8 as u64,
-                from.as_slice_ptr() as *mut u8 as u64,
+                to.as_slice_ptr().cast::<u8>() as u64,
+                from.as_slice_ptr().cast::<u8>() as u64,
                 std::mem::size_of::<T>() * from.len(),
             )
             .to_cuda_result()
@@ -82,13 +85,13 @@ impl<'a> DeviceAllocator for UnifiedAlloc {
         let mut ptr: *mut c_void = std::ptr::null_mut();
         unsafe {
             cust_raw::cuMemAllocManaged(
-                &mut ptr as *mut *mut c_void as *mut u64,
+                (&mut ptr as *mut *mut c_void).cast(),
                 size,
                 CUmemAttach_flags_enum::CU_MEM_ATTACH_GLOBAL as u32,
             )
             .to_cuda_result()?;
         }
-        let ptr = std::ptr::from_raw_parts_mut(ptr as *mut (), size);
+        let ptr = std::ptr::from_raw_parts_mut(ptr.cast(), size);
         unsafe { Ok(NonNull::new_unchecked(ptr)) }
     }
 
@@ -163,7 +166,7 @@ fn d_ptr1(ptr: NonNull<u8, CudaUnified>) -> cust_raw::CUdeviceptr {
     d_ptr3(ptr.as_ptr())
 }
 fn d_ptr2(ptr: *mut [u8]) -> cust_raw::CUdeviceptr {
-    ptr as *mut u8 as cust_raw::CUdeviceptr
+    ptr.cast::<u8>() as cust_raw::CUdeviceptr
 }
 fn d_ptr3(ptr: *mut u8) -> cust_raw::CUdeviceptr {
     ptr as cust_raw::CUdeviceptr
@@ -205,7 +208,10 @@ impl<T: ?Sized> DerefMut for Unified<T> {
     }
 }
 
-impl<'a, T: ?Sized> Default for &'a Unified<T> where &'a T: Default {
+impl<'a, T: ?Sized> Default for &'a Unified<T>
+where
+    &'a T: Default,
+{
     fn default() -> Self {
         <&'a T>::default().into()
     }

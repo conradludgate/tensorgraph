@@ -12,9 +12,9 @@ use super::{SharedCublasContext, ToCublasResult, GEMM};
 impl From<MatrixOp> for rcublas_sys::cublasOperation_t {
     fn from(op: MatrixOp) -> Self {
         match op {
-            MatrixOp::NoTrans => rcublas_sys::cublasOperation_t::CUBLAS_OP_N,
-            MatrixOp::Trans => rcublas_sys::cublasOperation_t::CUBLAS_OP_T,
-            // MatrixOp::ConjTrans => rcublas_sys::cublasOperation_t::CUBLAS_OP_HERMITAN,
+            MatrixOp::NoTrans => Self::CUBLAS_OP_N,
+            MatrixOp::Trans => Self::CUBLAS_OP_T,
+            // MatrixOp::ConjTrans => Self::CUBLAS_OP_HERMITAN,
         }
     }
 }
@@ -29,13 +29,13 @@ impl<'a> GEMM<&'a SharedCublasContext> for f32 {
         m: i32,
         n: i32,
         k: i32,
-        alpha: f32,
-        a: DevicePointer<f32>,
+        alpha: Self,
+        a: DevicePointer<Self>,
         lda: i32,
-        b: DevicePointer<f32>,
+        b: DevicePointer<Self>,
         ldb: i32,
-        beta: f32,
-        mut c: DevicePointer<f32>,
+        beta: Self,
+        mut c: DevicePointer<Self>,
         ldc: i32,
     ) {
         cublasSgemm_v2(
@@ -67,13 +67,13 @@ impl<'a> GEMM<&'a SharedCublasContext> for f64 {
         m: i32,
         n: i32,
         k: i32,
-        alpha: f64,
-        a: DevicePointer<f64>,
+        alpha: Self,
+        a: DevicePointer<Self>,
         lda: i32,
-        b: DevicePointer<f64>,
+        b: DevicePointer<Self>,
         ldb: i32,
-        beta: f64,
-        mut c: DevicePointer<f64>,
+        beta: Self,
+        mut c: DevicePointer<Self>,
         ldc: i32,
     ) {
         cublasDgemm_v2(
@@ -105,13 +105,13 @@ impl<'a> GEMM<&'a Unified<SharedCublasContext>> for f32 {
         m: i32,
         n: i32,
         k: i32,
-        alpha: f32,
-        a: *mut f32,
+        alpha: Self,
+        a: *mut Self,
         lda: i32,
-        b: *mut f32,
+        b: *mut Self,
         ldb: i32,
-        beta: f32,
-        c: *mut f32,
+        beta: Self,
+        c: *mut Self,
         ldc: i32,
     ) {
         cublasSgemm_v2(
@@ -143,13 +143,13 @@ impl<'a> GEMM<&'a Unified<SharedCublasContext>> for f64 {
         m: i32,
         n: i32,
         k: i32,
-        alpha: f64,
-        a: *mut f64,
+        alpha: Self,
+        a: *mut Self,
         lda: i32,
-        b: *mut f64,
+        b: *mut Self,
         ldb: i32,
-        beta: f64,
-        c: *mut f64,
+        beta: Self,
+        c: *mut Self,
         ldc: i32,
     ) {
         cublasDgemm_v2(

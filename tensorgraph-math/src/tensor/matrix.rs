@@ -30,9 +30,8 @@ impl<S: Storage> Matrix<S> {
     /// Multiply two matricies together.
     pub fn dot(&self, rhs: Matrix<&ViewOf<S>>) -> Matrix<DefaultVec<S::T, S::Device>>
     where
-        S::T: Zero + One,
         S::Device: DefaultDeviceAllocator + DefaultBLASContext,
-        S::T: GEMM<<S::Device as DefaultBLASContext>::Context>,
+        S::T: Zero + One + GEMM<<S::Device as DefaultBLASContext>::Context>,
     {
         self.dot_using(rhs, Default::default())
     }
@@ -44,9 +43,8 @@ impl<S: Storage> Matrix<S> {
         ctx: C,
     ) -> Matrix<DefaultVec<S::T, S::Device>>
     where
-        S::T: Zero + One,
         S::Device: DefaultDeviceAllocator,
-        S::T: GEMM<C>,
+        S::T: Zero + One + GEMM<C>,
     {
         self.dot_into(rhs, ctx, Default::default())
     }
@@ -59,8 +57,7 @@ impl<S: Storage> Matrix<S> {
         alloc: A,
     ) -> Matrix<Vec<S::T, A>>
     where
-        S::T: Zero + One,
-        S::T: GEMM<C>,
+        S::T: Zero + One + GEMM<C>,
     {
         let rows = self.shape[0];
         let cols = rhs.shape[1];
@@ -107,11 +104,11 @@ impl<'a, T, D: Device, Dim: Dimension> TensorView<'a, MaybeUninit<T>, D, Dim> {
 /// Uses the default [`BLASContext`] for the device.
 pub fn gemm_uninit<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
     alpha: F,
-    a: Matrix<impl Storage<T = F, Device = D>>,
-    b: Matrix<impl Storage<T = F, Device = D>>,
+    a: MatrixView<F, D>,
+    b: MatrixView<F, D>,
     c: UninitMatrix<F, D>,
 ) {
-    gemm_uninit_ctx(D::Context::default(), alpha, a, b, c)
+    gemm_uninit_ctx(D::Context::default(), alpha, a, b, c);
 }
 
 /// Performs the basic matmul operation.
@@ -119,8 +116,8 @@ pub fn gemm_uninit<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
 pub fn gemm_uninit_ctx<F: GEMM<C> + Zero, C: BLASContext<Device = D>, D: Device>(
     ctx: C,
     alpha: F,
-    a: Matrix<impl Storage<T = F, Device = D>>,
-    b: Matrix<impl Storage<T = F, Device = D>>,
+    a: MatrixView<F, D>,
+    b: MatrixView<F, D>,
     c: UninitMatrix<F, D>,
 ) {
     // Safety:
@@ -134,21 +131,32 @@ pub fn gemm_uninit_ctx<F: GEMM<C> + Zero, C: BLASContext<Device = D>, D: Device>
 /// Uses the default [`BLASContext`] for the device.
 pub fn gemm<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
     alpha: F,
-    a: Matrix<impl Storage<T = F, Device = D>>,
-    b: Matrix<impl Storage<T = F, Device = D>>,
+    a: MatrixView<F, D>,
+    b: MatrixView<F, D>,
     beta: F,
     c: MatrixViewMut<F, D>,
 ) {
-    gemm_ctx(D::Context::default(), alpha, a, b, beta, c)
+    gemm_ctx(D::Context::default(), alpha, a, b, beta, c);
 }
 
 /// Performs the basic matmul operation.
 /// C = alpha * A * B + beta * C.
+///
+/// # Panics
+/// If the shapes of the matricies do not match the following pattern:
+/// * A = [M, K]
+/// * B = [K, N]
+/// * C = [M, N]
+#[allow(
+    clippy::cast_possible_wrap,
+    clippy::cast_possible_truncation,
+    clippy::needless_pass_by_value
+)]
 pub fn gemm_ctx<F: GEMM<C> + Zero, C: BLASContext<Device = D>, D: Device>(
     ctx: C,
     alpha: F,
-    a: Matrix<impl Storage<T = F, Device = D>>,
-    b: Matrix<impl Storage<T = F, Device = D>>,
+    a: MatrixView<F, D>,
+    b: MatrixView<F, D>,
     beta: F,
     c: MatrixViewMut<F, D>,
 ) {
@@ -186,10 +194,11 @@ pub fn gemm_ctx<F: GEMM<C> + Zero, C: BLASContext<Device = D>, D: Device>(
             beta,
             c.data.as_ptr(),
             ldc,
-        )
+        );
     }
 }
 
+#[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
 fn lead(s: [usize; 2]) -> (MatrixOp, i32) {
     if s[0] == 1 {
         (MatrixOp::NoTrans, s[1] as i32)

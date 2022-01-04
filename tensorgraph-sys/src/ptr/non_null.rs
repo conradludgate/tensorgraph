@@ -5,7 +5,7 @@ use crate::device::{Device, DevicePtr};
 /// Same as [`std::ptr::NonNull<T>`] but backed by a [`Device::Ptr`] instead of a raw pointer
 pub struct NonNull<T: ?Sized, D: Device> {
     inner: std::ptr::NonNull<T>,
-    _marker: PhantomData<D>,
+    marker: PhantomData<D>,
 }
 
 impl<T: ?Sized, D: Device> Debug for NonNull<T, D> {
@@ -28,7 +28,7 @@ impl<T: ?Sized, D: Device> NonNull<T, D> {
         let inner = std::ptr::NonNull::new(ptr.as_raw())?;
         Some(Self {
             inner,
-            _marker: PhantomData,
+            marker: PhantomData,
         })
     }
 
@@ -38,22 +38,25 @@ impl<T: ?Sized, D: Device> NonNull<T, D> {
         let inner = std::ptr::NonNull::new_unchecked(ptr.as_raw());
         Self {
             inner,
-            _marker: PhantomData,
+            marker: PhantomData,
         }
     }
 
+    #[must_use]
     pub fn as_ptr(self) -> D::Ptr<T> {
         D::Ptr::from_raw(self.inner.as_ptr())
     }
 
+    #[must_use]
     pub fn cast<U>(self) -> NonNull<U, D> {
-        let Self { inner, _marker } = self;
+        let Self { inner, marker } = self;
         NonNull {
             inner: inner.cast(),
-            _marker,
+            marker,
         }
     }
 
+    #[must_use]
     pub fn to_raw_parts(self) -> (NonNull<(), D>, <T as Pointee>::Metadata) {
         let (ptr, meta) = self.inner.as_ptr().to_raw_parts();
         let ptr = D::Ptr::from_raw(ptr);
@@ -63,9 +66,10 @@ impl<T: ?Sized, D: Device> NonNull<T, D> {
 }
 
 impl<T, D: Device> NonNull<[T], D> {
+    #[must_use]
     pub fn slice_from_raw_parts(data: NonNull<T, D>, len: usize) -> Self {
-        let NonNull { inner, _marker } = data;
+        let NonNull { inner, marker } = data;
         let inner = std::ptr::NonNull::slice_from_raw_parts(inner, len);
-        Self { inner, _marker }
+        Self { inner, marker }
     }
 }
