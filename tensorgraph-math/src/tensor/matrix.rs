@@ -32,13 +32,13 @@ impl<S: Storage> Matrix<S> {
     where
         S::T: Zero + One,
         S::Device: DefaultDeviceAllocator + DefaultBLASContext,
-        S::T: GEMM<<S::Device as DefaultBLASContext>::Context, S::Device>,
+        S::T: GEMM<<S::Device as DefaultBLASContext>::Context>,
     {
         self.dot_using(rhs, Default::default())
     }
 
     /// Multiply two matricies together, using the specified [`BLASContext`]
-    pub fn dot_using<C: BLASContext<S::Device>>(
+    pub fn dot_using<C: BLASContext<Device = S::Device>>(
         &self,
         rhs: Matrix<&ViewOf<S>>,
         ctx: C,
@@ -46,13 +46,13 @@ impl<S: Storage> Matrix<S> {
     where
         S::T: Zero + One,
         S::Device: DefaultDeviceAllocator,
-        S::T: GEMM<C, S::Device>,
+        S::T: GEMM<C>,
     {
         self.dot_into(rhs, ctx, Default::default())
     }
 
     /// Multiply two matricies together, using the provided [`DeviceAllocator`], using the specified [`BLASContext`]
-    pub fn dot_into<C: BLASContext<S::Device>, A: DeviceAllocator<Device = S::Device>>(
+    pub fn dot_into<C: BLASContext<Device = S::Device>, A: DeviceAllocator<Device = S::Device>>(
         &self,
         rhs: Matrix<&ViewOf<S>>,
         ctx: C,
@@ -60,7 +60,7 @@ impl<S: Storage> Matrix<S> {
     ) -> Matrix<Vec<S::T, A>>
     where
         S::T: Zero + One,
-        S::T: GEMM<C, S::Device>,
+        S::T: GEMM<C>,
     {
         let rows = self.shape[0];
         let cols = rhs.shape[1];
@@ -105,7 +105,7 @@ impl<'a, T, D: Device, Dim: Dimension> TensorView<'a, MaybeUninit<T>, D, Dim> {
 /// C = alpha * A * B.
 ///
 /// Uses the default [`BLASContext`] for the device.
-pub fn gemm_uninit<F: GEMM<D::Context, D> + Zero, D: DefaultBLASContext>(
+pub fn gemm_uninit<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
     alpha: F,
     a: Matrix<impl Storage<T = F, Device = D>>,
     b: Matrix<impl Storage<T = F, Device = D>>,
@@ -116,7 +116,7 @@ pub fn gemm_uninit<F: GEMM<D::Context, D> + Zero, D: DefaultBLASContext>(
 
 /// Performs the basic matmul operation.
 /// C = alpha * A * B.
-pub fn gemm_uninit_ctx<F: GEMM<C, D> + Zero, C: BLASContext<D>, D: Device>(
+pub fn gemm_uninit_ctx<F: GEMM<C> + Zero, C: BLASContext<Device = D>, D: Device>(
     ctx: C,
     alpha: F,
     a: Matrix<impl Storage<T = F, Device = D>>,
@@ -132,7 +132,7 @@ pub fn gemm_uninit_ctx<F: GEMM<C, D> + Zero, C: BLASContext<D>, D: Device>(
 /// C = alpha * A * B + beta * C.
 ///
 /// Uses the default [`BLASContext`] for the device.
-pub fn gemm<F: GEMM<D::Context, D> + Zero, D: DefaultBLASContext>(
+pub fn gemm<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
     alpha: F,
     a: Matrix<impl Storage<T = F, Device = D>>,
     b: Matrix<impl Storage<T = F, Device = D>>,
@@ -144,7 +144,7 @@ pub fn gemm<F: GEMM<D::Context, D> + Zero, D: DefaultBLASContext>(
 
 /// Performs the basic matmul operation.
 /// C = alpha * A * B + beta * C.
-pub fn gemm_ctx<F: GEMM<C, D> + Zero, C: BLASContext<D>, D: Device>(
+pub fn gemm_ctx<F: GEMM<C> + Zero, C: BLASContext<Device = D>, D: Device>(
     ctx: C,
     alpha: F,
     a: Matrix<impl Storage<T = F, Device = D>>,

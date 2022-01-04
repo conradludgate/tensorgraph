@@ -1,11 +1,9 @@
 extern crate blas_src;
 extern crate blas_sys;
 
-use tensorgraph_sys::device::cpu::Cpu;
-
 use crate::blas::{MatrixOp, GEMM};
 
-impl GEMM<(), Cpu> for f32 {
+impl GEMM<()> for f32 {
     unsafe fn gemm(
         _ctx: (),
         transa: MatrixOp,
@@ -40,7 +38,7 @@ impl GEMM<(), Cpu> for f32 {
     }
 }
 
-impl GEMM<(), Cpu> for f64 {
+impl GEMM<()> for f64 {
     unsafe fn gemm(
         _ctx: (),
         transa: MatrixOp,

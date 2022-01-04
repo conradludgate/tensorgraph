@@ -14,7 +14,7 @@ pub fn matmul_1000_256<D: DefaultDeviceAllocator + DefaultBLASContext>(
     init: &[f64],
 ) -> DefaultVec<f64, D>
 where
-    f64: GEMM<D::Context, D>,
+    f64: GEMM<D::Context>,
     D::Alloc: Clone,
     D::Context: Copy,
 {

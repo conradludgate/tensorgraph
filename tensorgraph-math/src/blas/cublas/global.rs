@@ -40,7 +40,7 @@ impl DefaultBLASContext for Cuda {
 }
 
 impl DefaultBLASContext for CudaUnified {
-    type Context = &'static SharedCublasContext;
+    type Context = &'static Unified<SharedCublasContext>;
 }
 
 impl Default for &'static SharedCublasContext {

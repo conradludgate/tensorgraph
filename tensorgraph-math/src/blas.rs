@@ -1,4 +1,4 @@
-use tensorgraph_sys::device::Device;
+use tensorgraph_sys::{device::Device, ptr::DPtr};
 
 mod cpu;
 
@@ -15,15 +15,17 @@ pub enum MatrixOp {
 }
 
 /// A context needed for running BLAS operations
-pub trait BLASContext<D: Device>: Clone {}
+pub trait BLASContext: Clone {
+    type Device: Device;
+}
 
 /// The default blas context for a device
 pub trait DefaultBLASContext: Device {
-    type Context: BLASContext<Self> + Default;
+    type Context: BLASContext<Device = Self> + Default;
 }
 
 /// A type that can be matrix multiplied
-pub trait GEMM<C: BLASContext<D>, D: Device>: Sized + Copy {
+pub trait GEMM<C: BLASContext>: Sized + Copy {
     #[allow(clippy::too_many_arguments)]
     /// # Safety
     /// This is often a call across an FFI barrier, so the links or devices need to be
@@ -36,12 +38,12 @@ pub trait GEMM<C: BLASContext<D>, D: Device>: Sized + Copy {
         n: i32,
         k: i32,
         alpha: Self,
-        a: D::Ptr<Self>,
+        a: DPtr<Self, C::Device>,
         lda: i32,
-        b: D::Ptr<Self>,
+        b: DPtr<Self, C::Device>,
         ldb: i32,
         beta: Self,
-        c: D::Ptr<Self>,
+        c: DPtr<Self, C::Device>,
         ldc: i32,
     );
 }

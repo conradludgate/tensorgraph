@@ -168,3 +168,63 @@ fn d_ptr2(ptr: *mut [u8]) -> cust_raw::CUdeviceptr {
 fn d_ptr3(ptr: *mut u8) -> cust_raw::CUdeviceptr {
     ptr as cust_raw::CUdeviceptr
 }
+
+/// Newtype wrapper used in any unified contexts.
+#[repr(transparent)]
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Unified<T: ?Sized>(T);
+
+impl<T> From<T> for Unified<T> {
+    fn from(t: T) -> Self {
+        Self(t)
+    }
+}
+
+impl<T> From<Unified<T>> for T {
+    fn from(t: Unified<T>) -> Self {
+        t.0
+    }
+}
+
+impl<'a, T: ?Sized> From<&'a T> for &'a Unified<T> {
+    fn from(t: &'a T) -> Self {
+        unsafe { &*(t as *const _ as *const _) }
+    }
+}
+
+impl<'a, T: ?Sized> From<&'a Unified<T>> for &'a T {
+    fn from(t: &'a Unified<T>) -> Self {
+        t
+    }
+}
+
+impl<T: ?Sized> Deref for Unified<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<'a, T: ?Sized> From<&'a mut T> for &'a mut Unified<T> {
+    fn from(t: &'a mut T) -> Self {
+        unsafe { &mut *(t as *mut _ as *mut _) }
+    }
+}
+
+impl<'a, T: ?Sized> From<&'a mut Unified<T>> for &'a mut T {
+    fn from(t: &'a mut Unified<T>) -> Self {
+        t
+    }
+}
+
+impl<T: ?Sized> DerefMut for Unified<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+impl<'a, T: ?Sized> Default for &'a Unified<T> where &'a T: Default {
+    fn default() -> Self {
+        <&'a T>::default().into()
+    }
+}

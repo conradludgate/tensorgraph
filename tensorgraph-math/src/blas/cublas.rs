@@ -76,8 +76,13 @@ impl SharedCublasContext {
     }
 }
 
-impl<'a> BLASContext<Cuda> for &'a SharedCublasContext {}
-impl<'a> BLASContext<CudaUnified> for &'a SharedCublasContext {}
+impl<'a> BLASContext for &'a SharedCublasContext {
+    type Device = Cuda;
+}
+
+impl<'a> BLASContext for &'a Unified<SharedCublasContext> {
+    type Device = CudaUnified;
+}
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum CublasError {
