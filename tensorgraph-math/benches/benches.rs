@@ -1,11 +1,11 @@
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
-use tensorgraph_sys::{
-    device::{cpu::Cpu, DefaultDeviceAllocator},
-    DefaultVec, View, ViewMut,
-};
 
 use tensorgraph_math::{
     blas::{DefaultBLASContext, GEMM},
+    sys::{
+        device::{cpu::Cpu, DefaultDeviceAllocator},
+        DefaultVec, View, ViewMut,
+    },
     tensor::{gemm_ctx, Tensor},
 };
 

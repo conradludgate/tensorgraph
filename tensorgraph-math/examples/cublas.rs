@@ -1,9 +1,11 @@
-use tensorgraph_sys::{
-    device::cuda::{Context, Cuda, Stream},
-    DefaultVec, View,
+use tensorgraph_math::{
+    blas::cublas::CublasContext,
+    sys::{
+        device::cuda::{Context, Cuda, Stream},
+        DefaultVec, View,
+    },
+    tensor::Tensor,
 };
-
-use tensorgraph_math::{blas::cublas::CublasContext, tensor::Tensor};
 
 fn main() {
     // init cuda context

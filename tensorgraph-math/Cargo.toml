@@ -41,4 +41,4 @@ intel-mkl = ["blas-sys", "blas-src/intel-mkl"]
 netlib = ["blas-sys", "blas-src/netlib"]
 openblas = ["blas-sys", "blas-src/openblas"]
 
-matrixmultiply_threading = ["matrixmultiply/threading"]
+matrixmultiply_threading = ["matrixmultiply", "matrixmultiply/threading"]
