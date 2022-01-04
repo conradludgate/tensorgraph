@@ -1,7 +1,7 @@
 use std::{cell::RefCell, lazy::Lazy};
 
 use rcublas_sys::cublasContext;
-use tensorgraph_sys::device::cuda::{Cuda, CudaUnified};
+use tensorgraph_sys::device::cuda::{Cuda, CudaUnified, Unified};
 
 use crate::blas::DefaultBLASContext;
 

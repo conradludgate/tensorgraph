@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use std::{ffi::c_void, ops::{Deref, DerefMut}};
 
 use cust::error::{CudaError, CudaResult};
 use cust_raw::CUmemAttach_flags_enum;
@@ -180,21 +180,9 @@ impl<T> From<T> for Unified<T> {
     }
 }
 
-impl<T> From<Unified<T>> for T {
-    fn from(t: Unified<T>) -> Self {
-        t.0
-    }
-}
-
 impl<'a, T: ?Sized> From<&'a T> for &'a Unified<T> {
     fn from(t: &'a T) -> Self {
         unsafe { &*(t as *const _ as *const _) }
-    }
-}
-
-impl<'a, T: ?Sized> From<&'a Unified<T>> for &'a T {
-    fn from(t: &'a Unified<T>) -> Self {
-        t
     }
 }
 
@@ -208,12 +196,6 @@ impl<T: ?Sized> Deref for Unified<T> {
 impl<'a, T: ?Sized> From<&'a mut T> for &'a mut Unified<T> {
     fn from(t: &'a mut T) -> Self {
         unsafe { &mut *(t as *mut _ as *mut _) }
-    }
-}
-
-impl<'a, T: ?Sized> From<&'a mut Unified<T>> for &'a mut T {
-    fn from(t: &'a mut Unified<T>) -> Self {
-        t
     }
 }
 

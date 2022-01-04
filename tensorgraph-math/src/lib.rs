@@ -75,7 +75,7 @@
 //! /// using that devices default allocator and BLAS provider
 //! fn run<D: DefaultDeviceAllocator + DefaultBLASContext>()
 //! where
-//!     f32: GEMM<D::Context, D>,
+//!     f32: GEMM<D::Context>,
 //! {
 //!     //     0 1
 //!     // A = 2 3
@@ -135,15 +135,15 @@
 //!
 //!     // run using the CUDA stream as the allocator, and cublas
 //!     // as the BLAS provider
-//!     run::<Cuda, _, _>(cublas_ctx, stream.deref());
+//!     run(cublas_ctx, stream.deref());
 //!
 //!     // run using the CPU default BLAS and Global allocator
-//!     run::<Cpu, _, _>((), Global);
+//!     run((), Global);
 //! }
 //!
-//! fn run<D: Device, C: BLASContext<D>, A: DeviceAllocator<D> + Copy>(ctx: C, alloc: A)
+//! fn run<C: BLASContext, A: DeviceAllocator<Device = C::Device> + Copy>(ctx: C, alloc: A)
 //! where
-//!     f32: GEMM<C, D>,
+//!     f32: GEMM<C>,
 //! {
 //!     //     0 1
 //!     // A = 2 3

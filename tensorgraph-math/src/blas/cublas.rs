@@ -5,7 +5,7 @@ use rcublas_sys::{
     cublasStatus_t,
 };
 
-use tensorgraph_sys::device::cuda::{Cuda, CudaUnified, SharedStream};
+use tensorgraph_sys::device::cuda::{Cuda, CudaUnified, SharedStream, Unified};
 
 use super::{BLASContext, GEMM};
 

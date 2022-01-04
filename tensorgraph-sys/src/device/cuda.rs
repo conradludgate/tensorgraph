@@ -17,7 +17,7 @@ mod unified;
 pub use context::{AttachedContext, Context, FloatingContext, SharedContext};
 pub use global::get_stream;
 pub use stream::{SharedStream, Stream};
-pub use unified::{CudaUnified, UnifiedAlloc};
+pub use unified::{CudaUnified, UnifiedAlloc, Unified};
 
 #[derive(Debug)]
 /// Device for CUDA enabled GPUs
