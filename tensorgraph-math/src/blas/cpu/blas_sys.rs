@@ -5,10 +5,21 @@ use crate::blas::{MatrixOp, BLAS1, BLAS2, BLAS3};
 
 macro_rules! impl_blas1 {
     ($float:ident =>
+        scal: $scal:path,
         axpy: $axpy:path,
         dot: $dot:path,
     ) => {
         impl BLAS1<()> for $float {
+            unsafe fn scal(
+                _ctx: (),
+                n: i32,
+                alpha: Self,
+                x: *mut Self,
+                incx: i32,
+            ) {
+                $scal(&n, &alpha, x, &incx);
+            }
+
             unsafe fn axpy(
                 _ctx: (),
                 n: i32,
@@ -113,6 +124,7 @@ macro_rules! impl_blas3 {
 }
 
 impl_blas1!(f32 =>
+    scal: blas_sys::sscal_,
     axpy: blas_sys::saxpy_,
     dot: blas_sys::sdot_,
 );
@@ -124,6 +136,7 @@ impl_blas3!(f32 =>
 );
 
 impl_blas1!(f64 =>
+    scal: blas_sys::dscal_,
     axpy: blas_sys::daxpy_,
     dot: blas_sys::ddot_,
 );

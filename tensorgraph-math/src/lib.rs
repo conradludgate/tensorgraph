@@ -31,7 +31,7 @@
 //! // C = AB =  6 11
 //! //          10 19
 //!
-//! let c = a.dot(b.view());
+//! let c = a.matmul(b.view());
 //! assert_eq!(c.into_inner().into_std(), [2., 6., 10., 3., 11., 19.]);
 //! ```
 //!
@@ -95,7 +95,7 @@
 //!     // C = AB =  6 11
 //!     //          10 19
 //!
-//!     let c = a.dot(b.view());
+//!     let c = a.matmul(b.view());
 //!
 //!     let mut out = [0.; 6];
 //!     c.into_inner().copy_to_host(&mut out);
@@ -163,7 +163,7 @@
 //!     // C = AB =  6 11
 //!     //          10 19
 //!
-//!     let c = a.dot_into(b.view(), ctx, alloc);
+//!     let c = a.matmul_into(b.view(), ctx, alloc);
 //!
 //!     let mut out = [0.; 6];
 //!     c.into_inner().copy_to_host(&mut out);

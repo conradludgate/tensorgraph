@@ -1,7 +1,3 @@
-use rcublas_sys::{
-    cublasDaxpy_v2, cublasDdot_v2, cublasDgemm_v2, cublasSaxpy_v2, cublasSdot_v2, cublasSgemm_v2, cublasSgemv_v2, cublasDgemv_v2,
-};
-
 use tensorgraph_sys::{
     device::{cuda::Unified, DevicePtr},
     ptr::DPtr,
@@ -23,10 +19,29 @@ impl From<MatrixOp> for rcublas_sys::cublasOperation_t {
 
 macro_rules! impl_cublas1 {
     ($float:ident<$ctx:ty> =>
+        scal: $scal:path,
         axpy: $axpy:path,
         dot: $dot:path,
     ) => {
         impl<'a> BLAS1<&'a $ctx> for $float {
+            unsafe fn scal(
+                handle: &$ctx,
+                n: i32,
+                alpha: Self,
+                x: DPtr<Self, <&'a $ctx as BLASContext>::Device>,
+                incx: i32,
+            ) {
+                $scal(
+                    handle.handle(),
+                    n,
+                    &alpha,
+                    DevicePtr::as_raw(x),
+                    incx,
+                )
+                .to_cublas_result()
+                .unwrap();
+            }
+
             unsafe fn axpy(
                 handle: &$ctx,
                 n: i32,
@@ -159,45 +174,49 @@ macro_rules! impl_cublas3 {
 }
 
 impl_cublas1!(f32<SharedCublasContext> =>
-    axpy: cublasSaxpy_v2,
-    dot: cublasSdot_v2,
+    scal: rcublas_sys::cublasSscal_v2,
+    axpy: rcublas_sys::cublasSaxpy_v2,
+    dot: rcublas_sys::cublasSdot_v2,
 );
 impl_cublas2!(f32<SharedCublasContext> =>
-    gemv: cublasSgemv_v2,
+    gemv: rcublas_sys::cublasSgemv_v2,
 );
 impl_cublas3!(f32<SharedCublasContext> =>
-    gemm: cublasSgemm_v2,
+    gemm: rcublas_sys::cublasSgemm_v2,
 );
 
 impl_cublas1!(f64<SharedCublasContext> =>
-    axpy: cublasDaxpy_v2,
-    dot: cublasDdot_v2,
+    scal: rcublas_sys::cublasDscal_v2,
+    axpy: rcublas_sys::cublasDaxpy_v2,
+    dot: rcublas_sys::cublasDdot_v2,
 );
 impl_cublas2!(f64<SharedCublasContext> =>
-    gemv: cublasDgemv_v2,
+    gemv: rcublas_sys::cublasDgemv_v2,
 );
 impl_cublas3!(f64<SharedCublasContext> =>
-    gemm: cublasDgemm_v2,
+    gemm: rcublas_sys::cublasDgemm_v2,
 );
 
 impl_cublas1!(f32<Unified<SharedCublasContext>> =>
-    axpy: cublasSaxpy_v2,
-    dot: cublasSdot_v2,
+    scal: rcublas_sys::cublasSscal_v2,
+    axpy: rcublas_sys::cublasSaxpy_v2,
+    dot: rcublas_sys::cublasSdot_v2,
 );
 impl_cublas2!(f32<Unified<SharedCublasContext>> =>
-    gemv: cublasSgemv_v2,
+    gemv: rcublas_sys::cublasSgemv_v2,
 );
 impl_cublas3!(f32<Unified<SharedCublasContext>> =>
-    gemm: cublasSgemm_v2,
+    gemm: rcublas_sys::cublasSgemm_v2,
 );
 
 impl_cublas1!(f64<Unified<SharedCublasContext>> =>
-    axpy: cublasDaxpy_v2,
-    dot: cublasDdot_v2,
+    scal: rcublas_sys::cublasDscal_v2,
+    axpy: rcublas_sys::cublasDaxpy_v2,
+    dot: rcublas_sys::cublasDdot_v2,
 );
 impl_cublas2!(f64<Unified<SharedCublasContext>> =>
-    gemv: cublasDgemv_v2,
+    gemv: rcublas_sys::cublasDgemv_v2,
 );
 impl_cublas3!(f64<Unified<SharedCublasContext>> =>
-    gemm: cublasDgemm_v2,
+    gemm: rcublas_sys::cublasDgemm_v2,
 );

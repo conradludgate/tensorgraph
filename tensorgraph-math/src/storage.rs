@@ -98,3 +98,33 @@ impl<T, A: Allocator> IntoOwned for std::vec::Vec<T, A> {
         self
     }
 }
+
+// Shared Slice (CPU Only)
+
+impl<'a, T> Storage for &'a [T] {
+    type T = T;
+    type Device = Cpu;
+}
+
+impl<'a, T: Copy> IntoOwned for &'a [T] {
+    type Owned = std::vec::Vec<T>;
+    fn into_owned(self) -> Self::Owned {
+        self.to_owned()
+    }
+}
+
+// Mut Slice (CPU Only)
+
+impl<'a, T> Storage for &'a mut [T] {
+    type T = T;
+    type Device = Cpu;
+}
+
+impl<'a, T> StorageMut for &'a mut [T] {}
+
+impl<'a, T: Copy> IntoOwned for &'a mut [T] {
+    type Owned = std::vec::Vec<T>;
+    fn into_owned(self) -> Self::Owned {
+        self.to_owned()
+    }
+}

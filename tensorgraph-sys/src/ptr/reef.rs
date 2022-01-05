@@ -186,3 +186,15 @@ impl<T, A: Allocator> AsMut<Ref<[T], Cpu>> for std::vec::Vec<T, A> {
         unsafe { &mut *(self.as_mut_slice() as *mut [T] as *mut Ref<[T], Cpu>) }
     }
 }
+
+impl<T> AsRef<Ref<[T], Cpu>> for [T] {
+    fn as_ref(&self) -> &Ref<[T], Cpu> {
+        unsafe { &*(self as *const [T] as *const _) }
+    }
+}
+
+impl<T> AsMut<Ref<[T], Cpu>> for [T] {
+    fn as_mut(&mut self) -> &mut Ref<[T], Cpu> {
+        unsafe { &mut *(self as *mut [T] as *mut _) }
+    }
+}

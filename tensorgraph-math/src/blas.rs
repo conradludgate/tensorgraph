@@ -28,6 +28,20 @@ pub trait DefaultBLASContext: Device {
 #[allow(clippy::too_many_arguments)]
 pub trait BLAS1<C: BLASContext>: Sized + Copy {
     /// Computes
+    /// > X = alpha * X
+    ///
+    /// # Safety
+    /// This is often a call across an FFI barrier, so the links or devices need to be
+    /// running and may perform UB unchecked by rust
+    unsafe fn scal(
+        ctx: C,
+        n: i32,
+        alpha: Self,
+        x: DPtr<Self, C::Device>,
+        incx: i32,
+    );
+
+    /// Computes
     /// > Y = alpha * X + Y
     ///
     /// # Safety
