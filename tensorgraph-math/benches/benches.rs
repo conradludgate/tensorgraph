@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 
 use tensorgraph_math::{
-    blas::{DefaultBLASContext, GEMM},
+    blas::{DefaultBLASContext, BLAS},
     sys::{
         device::{cpu::Cpu, DefaultDeviceAllocator},
         DefaultVec, View, ViewMut,
@@ -9,12 +9,12 @@ use tensorgraph_math::{
     tensor::{gemm_ctx, Tensor},
 };
 
-/// Performs 1000 matrix mulitplications on a 256x256 matrix
-pub fn matmul_1000_256<D: DefaultDeviceAllocator + DefaultBLASContext>(
+/// Performs 100 matrix mulitplications on a 512x512 matrix
+pub fn matmul_100_512<D: DefaultDeviceAllocator + DefaultBLASContext>(
     init: &[f64],
 ) -> DefaultVec<f64, D>
 where
-    f64: GEMM<D::Context>,
+    f64: BLAS<D::Context>,
     D::Alloc: Clone,
     D::Context: Copy,
 {
@@ -22,12 +22,12 @@ where
     let b = a.clone();
     let c = b.clone();
 
-    let mut a = Tensor::from_shape([256, 256], a);
-    let b = Tensor::from_shape([256, 256], b);
-    let mut c = Tensor::from_shape([256, 256], c);
+    let mut a = Tensor::from_shape([512, 512], a);
+    let b = Tensor::from_shape([512, 512], b);
+    let mut c = Tensor::from_shape([512, 512], c);
 
     let ctx = D::Context::default();
-    for _ in 0..1000 {
+    for _ in 0..100 {
         gemm_ctx(ctx, 1., a.view(), b.view(), 0., c.view_mut());
         std::mem::swap(&mut a, &mut c);
     }
@@ -38,15 +38,15 @@ where
 pub fn matmul(c: &mut Criterion) {
     let mut group = c.benchmark_group("matmul");
 
-    let mut init = vec![0.0f64; 256 * 256];
+    let mut init = vec![0.0f64; 512 * 512];
     init[1] = 0.001;
-    for i in 0..256 {
-        let i = i * 256 + i; // diagonals
+    for i in 0..512 {
+        let i = i * 512 + i; // diagonals
         init[i] = 1.0;
     }
 
     let cpu = |b: &mut Bencher| {
-        b.iter(|| black_box(matmul_1000_256::<Cpu>(&init)));
+        b.iter(|| black_box(matmul_100_512::<Cpu>(&init)));
     };
 
     #[cfg(feature = "openblas")]
@@ -64,6 +64,9 @@ pub fn matmul(c: &mut Criterion) {
     #[cfg(feature = "accelerate")]
     group.bench_function("accelerate", cpu);
 
+    #[cfg(feature = "intel-mkl")]
+    group.bench_function("intel-mkl", cpu);
+
     #[cfg(feature = "cublas")]
     {
         use tensorgraph_math::blas::cublas::CublasContext;
@@ -78,8 +81,8 @@ pub fn matmul(c: &mut Criterion) {
         group.bench_function("cublas", |b| {
             b.iter(|| {
                 // includes the time to sync data in the benchmark
-                let mut out = vec![0.0f64; 256 * 256];
-                matmul_1000_256::<Cuda>(&init).copy_to_host(&mut out);
+                let mut out = vec![0.0f64; 512 * 512];
+                matmul_100_512::<Cuda>(&init).copy_to_host(&mut out);
 
                 black_box(out)
             });
@@ -88,8 +91,8 @@ pub fn matmul(c: &mut Criterion) {
         group.bench_function("cublas_unified", |b| {
             b.iter(|| {
                 // includes the time to sync data in the benchmark
-                let mut out = vec![0.0f64; 256 * 256];
-                matmul_1000_256::<CudaUnified>(&init).copy_to_host(&mut out);
+                let mut out = vec![0.0f64; 512 * 512];
+                matmul_100_512::<CudaUnified>(&init).copy_to_host(&mut out);
 
                 black_box(out)
             });
@@ -108,8 +111,8 @@ pub fn matmul(c: &mut Criterion) {
         group.bench_function("cublas_unified_sync", |b| {
             b.iter(|| {
                 // includes the time to sync data in the benchmark
-                let mut out = vec![0.0f64; 256 * 256];
-                matmul_1000_256::<CudaUnified>(&init).copy_to_host(&mut out);
+                let mut out = vec![0.0f64; 512 * 512];
+                matmul_100_512::<CudaUnified>(&init).copy_to_host(&mut out);
 
                 black_box(out)
             });

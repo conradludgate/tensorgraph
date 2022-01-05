@@ -21,6 +21,9 @@ pub trait Dimension: AsRef<[usize]> + AsMut<[usize]> + Clone {
 impl<const N: usize> Dimension for [usize; N] {}
 impl Dimension for Vec<usize> {}
 
+#[cfg(feature = "smallvec")]
+impl<const N: usize> Dimension for smallvec::SmallVec<[usize; N]> {}
+
 /// Reduce an axis from a dimension
 pub trait RemoveDim: Dimension {
     type Smaller: Dimension;
@@ -56,6 +59,16 @@ impl RemoveDim for Vec<usize> {
     }
 }
 
+#[cfg(feature = "smallvec")]
+impl<const N: usize> RemoveDim for smallvec::SmallVec<[usize; N]> {
+    type Smaller = Self;
+    fn remove(&self, axis: usize) -> (Self::Smaller, usize) {
+        let mut new = self.clone();
+        let n = Self::remove(&mut new, axis);
+        (new, n)
+    }
+}
+
 /// Insert an axis into a dimension
 pub trait InsertDim: Dimension {
     type Larger: Dimension;
@@ -82,6 +95,16 @@ where
 }
 
 impl InsertDim for Vec<usize> {
+    type Larger = Self;
+    fn insert(&self, axis: usize, n: usize) -> Self::Larger {
+        let mut new = self.clone();
+        Self::insert(&mut new, axis, n);
+        new
+    }
+}
+
+#[cfg(feature = "smallvec")]
+impl<const N: usize> InsertDim for smallvec::SmallVec<[usize; N]> {
     type Larger = Self;
     fn insert(&self, axis: usize, n: usize) -> Self::Larger {
         let mut new = self.clone();
