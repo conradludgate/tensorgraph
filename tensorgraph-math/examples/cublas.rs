@@ -41,7 +41,7 @@ fn run() {
     // C = AB =  6 11
     //          10 19
 
-    let c = a.dot(b.view());
+    let c = a.matmul(b.view());
 
     let mut out = [0.; 6];
     c.into_inner().copy_to_host(&mut out);

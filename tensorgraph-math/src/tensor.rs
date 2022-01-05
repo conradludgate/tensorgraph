@@ -1,6 +1,6 @@
 use std::mem::MaybeUninit;
 
-use tensorgraph_sys::{ptr::Ref, View, ViewMut};
+use tensorgraph_sys::{ptr::Ref, View, ViewMut, device::Device};
 
 use crate::{
     dims::{Dimension, RemoveDim},
@@ -8,7 +8,9 @@ use crate::{
 };
 
 mod matrix;
+mod vector;
 pub use matrix::*;
+pub use vector::*;
 
 /// A representation of a slice
 pub type Slice<T, D> = Ref<[T], D>;
@@ -139,6 +141,30 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
     }
 }
 
+impl<'a, T, D: Device, Dim: Dimension> UninitTensor<'a, T, D, Dim> {
+    /// # Safety
+    /// Contents must be initialised
+    pub unsafe fn assume_init(self) -> TensorViewMut<'a, T, D, Dim> {
+        Tensor {
+            shape: self.shape,
+            strides: self.strides,
+            data: self.data.assume_init_mut(),
+        }
+    }
+}
+
+impl<'a, T, D: Device, Dim: Dimension> TensorView<'a, MaybeUninit<T>, D, Dim> {
+    /// # Safety
+    /// Contents must be initialised
+    pub unsafe fn assume_init(self) -> TensorView<'a, T, D, Dim> {
+        Tensor {
+            shape: self.shape,
+            strides: self.strides,
+            data: self.data.assume_init(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use tensorgraph_sys::{View, ViewMut};
@@ -164,7 +190,7 @@ mod tests {
         // C = AB =  6 11
         //          10 19
 
-        let c = a.dot(b.view());
+        let c = a.matmul(b.view());
         assert_eq!(c.into_inner().into_std(), [2., 6., 10., 3., 11., 19.]);
     }
 
@@ -184,19 +210,19 @@ mod tests {
         // C1 = A^B^ = 19 22
         //             43 50
 
-        let c1 = a.t().dot(b.t());
+        let c1 = a.t().matmul(b.t());
         assert_eq!(c1.into_inner().into_std(), [19.0, 43.0, 22.0, 50.0]);
 
         // C2 = AB^ = 26 30
         //            38 44
 
-        let c2 = a.dot(b.t());
+        let c2 = a.matmul(b.t());
         assert_eq!(c2.into_inner().into_std(), [26.0, 38.0, 30.0, 44.0]);
 
         // C3 = A^B = 17 23
         //            39 53
 
-        let c3 = a.t().dot(b.view());
+        let c3 = a.t().matmul(b.view());
         assert_eq!(c3.into_inner().into_std(), [17.0, 39.0, 23.0, 53.0]);
     }
 
@@ -260,7 +286,7 @@ mod tests {
         let a = Tensor::from_shape([3, 2], a);
         let b = Tensor::from_shape([2, 2], b);
 
-        let c = a.dot_into(b.view(), ctx, cuda);
+        let c = a.matmul_into(b.view(), ctx, cuda);
 
         let mut out = vec![0.0_f32; 6];
         c.data.copy_to_host(&mut out);
@@ -291,7 +317,7 @@ mod tests {
         let a = Tensor::from_shape([3, 2], a);
         let b = Tensor::from_shape([2, 2], b);
 
-        let c = a.dot(b.view());
+        let c = a.matmul(b.view());
 
         let mut out = vec![0.0_f32; 6];
         c.data.copy_to_host(&mut out);

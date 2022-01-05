@@ -41,7 +41,7 @@ fn run(ctx: &SharedCublasContext, alloc: &SharedStream) {
     // C = AB =  6 11
     //          10 19
 
-    let c = a.dot_into(b.view(), ctx, alloc);
+    let c = a.matmul_into(b.view(), ctx, alloc);
 
     let mut out = [0.; 6];
     c.into_inner().copy_to_host(&mut out);

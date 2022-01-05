@@ -37,8 +37,37 @@ macro_rules! impl_blas1 {
 
 macro_rules! impl_blas2 {
     ($float:ident =>
+        gemv: $gemv:path,
     ) => {
-        impl BLAS2<()> for $float {}
+        impl BLAS2<()> for $float {
+            unsafe fn gemv(
+                _ctx: (),
+                trans: MatrixOp,
+                m: i32,
+                n: i32,
+                alpha: Self,
+                a: *mut Self,
+                lda: i32,
+                x: *mut Self,
+                incx: i32,
+                beta: Self,
+                y: *mut Self,
+                incy: i32,
+            ) {
+                $gemv(
+                    &(trans as i8),
+                    &m,
+                    &n,
+                    &alpha,
+                    a,
+                    &lda,
+                    x,
+                    &incx,
+                    &beta,
+                    y,
+                    &incy,
+                );
+            }}
     };
 }
 
@@ -88,6 +117,7 @@ impl_blas1!(f32 =>
     dot: blas_sys::sdot_,
 );
 impl_blas2!(f32 =>
+    gemv: blas_sys::sgemv_,
 );
 impl_blas3!(f32 =>
     gemm: blas_sys::sgemm_,
@@ -98,6 +128,7 @@ impl_blas1!(f64 =>
     dot: blas_sys::ddot_,
 );
 impl_blas2!(f64 =>
+    gemv: blas_sys::dgemv_,
 );
 impl_blas3!(f64 =>
     gemm: blas_sys::dgemm_,

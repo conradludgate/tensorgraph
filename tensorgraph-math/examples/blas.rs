@@ -20,6 +20,6 @@ fn main() {
     // C = AB =  6 11
     //          10 19
 
-    let c = a.dot(b.view());
+    let c = a.matmul(b.view());
     assert_eq!(c.into_inner().into_std(), [2., 6., 10., 3., 11., 19.]);
 }

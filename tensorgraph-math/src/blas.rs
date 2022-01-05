@@ -61,12 +61,32 @@ pub trait BLAS1<C: BLASContext>: Sized + Copy {
 /// BLAS Level 2 operations (Matrix-Vector)
 #[allow(clippy::too_many_arguments)]
 pub trait BLAS2<C: BLASContext>: Sized + Copy {
+    /// Compute the **Ge**neralised **M**atrix-**V**ector multiplication:
+    /// > y = alpha * Ax + beta * y
+    ///
+    /// # Safety
+    /// This is often a call across an FFI barrier, so the links or devices need to be
+    /// running and may perform UB unchecked by rust
+    unsafe fn gemv(
+        ctx: C,
+        trans: MatrixOp,
+        m: i32,
+        n: i32,
+        alpha: Self,
+        a: DPtr<Self, C::Device>,
+        lda: i32,
+        x: DPtr<Self, C::Device>,
+        incx: i32,
+        beta: Self,
+        y: DPtr<Self, C::Device>,
+        incy: i32,
+    );
 }
 
 /// BLAS Level 3 operations (Matrix-Matrix)
 #[allow(clippy::too_many_arguments)]
 pub trait BLAS3<C: BLASContext>: Sized + Copy {
-    /// Compute the **Ge**neralised **M**atrix **M**ultiplication:
+    /// Compute the **Ge**neralised **M**atrix-**M**atrix multiplication:
     /// > C = alpha * AB + beta * C
     ///
     /// # Safety

@@ -1,5 +1,5 @@
 use rcublas_sys::{
-    cublasDaxpy_v2, cublasDdot_v2, cublasDgemm_v2, cublasSaxpy_v2, cublasSdot_v2, cublasSgemm_v2,
+    cublasDaxpy_v2, cublasDdot_v2, cublasDgemm_v2, cublasSaxpy_v2, cublasSdot_v2, cublasSgemm_v2, cublasSgemv_v2, cublasDgemv_v2,
 };
 
 use tensorgraph_sys::{
@@ -77,8 +77,40 @@ macro_rules! impl_cublas1 {
 
 macro_rules! impl_cublas2 {
     ($float:ident<$ctx:ty> =>
+        gemv: $gemv:path,
     ) => {
-        impl<'a> BLAS2<&'a $ctx> for $float {}
+        impl<'a> BLAS2<&'a $ctx> for $float {
+            unsafe fn gemv(
+                handle: &$ctx,
+                trans: MatrixOp,
+                m: i32,
+                n: i32,
+                alpha: Self,
+                a: DPtr<Self, <&'a $ctx as BLASContext>::Device>,
+                lda: i32,
+                x: DPtr<Self, <&'a $ctx as BLASContext>::Device>,
+                incx: i32,
+                beta: Self,
+                y: DPtr<Self, <&'a $ctx as BLASContext>::Device>,
+                incy: i32,
+            ) {
+                $gemv(
+                    handle.handle(),
+                    trans.into(),
+                    m,
+                    n,
+                    &alpha,
+                    DevicePtr::as_raw(a),
+                    lda,
+                    DevicePtr::as_raw(x),
+                    incx,
+                    &beta,
+                    DevicePtr::as_raw(y),
+                    incy,
+                )
+                .to_cublas_result()
+                .unwrap();
+            }}
     };
 }
 
@@ -131,6 +163,7 @@ impl_cublas1!(f32<SharedCublasContext> =>
     dot: cublasSdot_v2,
 );
 impl_cublas2!(f32<SharedCublasContext> =>
+    gemv: cublasSgemv_v2,
 );
 impl_cublas3!(f32<SharedCublasContext> =>
     gemm: cublasSgemm_v2,
@@ -141,6 +174,7 @@ impl_cublas1!(f64<SharedCublasContext> =>
     dot: cublasDdot_v2,
 );
 impl_cublas2!(f64<SharedCublasContext> =>
+    gemv: cublasDgemv_v2,
 );
 impl_cublas3!(f64<SharedCublasContext> =>
     gemm: cublasDgemm_v2,
@@ -151,6 +185,7 @@ impl_cublas1!(f32<Unified<SharedCublasContext>> =>
     dot: cublasSdot_v2,
 );
 impl_cublas2!(f32<Unified<SharedCublasContext>> =>
+    gemv: cublasSgemv_v2,
 );
 impl_cublas3!(f32<Unified<SharedCublasContext>> =>
     gemm: cublasSgemm_v2,
@@ -161,6 +196,7 @@ impl_cublas1!(f64<Unified<SharedCublasContext>> =>
     dot: cublasDdot_v2,
 );
 impl_cublas2!(f64<Unified<SharedCublasContext>> =>
+    gemv: cublasDgemv_v2,
 );
 impl_cublas3!(f64<Unified<SharedCublasContext>> =>
     gemm: cublasDgemm_v2,
