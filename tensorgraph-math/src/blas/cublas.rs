@@ -7,7 +7,7 @@ use rcublas_sys::{
 
 use tensorgraph_sys::device::cuda::{Cuda, CudaUnified, SharedStream, Unified};
 
-use super::{BLASContext, GEMM};
+use super::{BLASContext};
 
 mod gemm;
 mod global;

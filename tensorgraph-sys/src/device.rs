@@ -1,3 +1,5 @@
+//! Provides trait defintion and implementations of a [`Device`]
+
 use std::alloc::Layout;
 
 use crate::ptr::{NonNull, Ref};

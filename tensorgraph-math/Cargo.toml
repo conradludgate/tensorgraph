@@ -20,8 +20,6 @@ rcublas-sys = { version = "0.5.0", optional = true }
 blas-src = { version = "0.8" }
 blas-sys = { version = "0.7", optional = true }
 
-matrixmultiply = { version = "0.3", optional = true }
-
 # smallvec dimension
 smallvec = { version = "1.7", optional = true, features = ["const_generics"] }
 
@@ -43,5 +41,3 @@ blis = ["blas-sys", "blas-src/blis"]
 intel-mkl = ["blas-sys", "blas-src/intel-mkl"]
 netlib = ["blas-sys", "blas-src/netlib"]
 openblas = ["blas-sys", "blas-src/openblas"]
-
-matrixmultiply_threading = ["matrixmultiply", "matrixmultiply/threading"]

@@ -72,7 +72,7 @@ impl DefaultDeviceAllocator for CudaUnified {
     type Alloc = UnifiedAlloc;
 }
 
-impl<'a> DeviceAllocator for UnifiedAlloc {
+impl DeviceAllocator for UnifiedAlloc {
     type AllocError = CudaError;
     type Device = CudaUnified;
 

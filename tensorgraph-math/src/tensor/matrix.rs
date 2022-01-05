@@ -7,7 +7,7 @@ use tensorgraph_sys::{
 };
 
 use crate::{
-    blas::{BLASContext, DefaultBLASContext, MatrixOp, GEMM},
+    blas::{BLASContext, DefaultBLASContext, MatrixOp, BLAS},
     dims::Dimension,
     storage::Storage,
 };
@@ -31,7 +31,7 @@ impl<S: Storage> Matrix<S> {
     pub fn dot(&self, rhs: Matrix<&ViewOf<S>>) -> Matrix<DefaultVec<S::T, S::Device>>
     where
         S::Device: DefaultDeviceAllocator + DefaultBLASContext,
-        S::T: Zero + One + GEMM<<S::Device as DefaultBLASContext>::Context>,
+        S::T: Zero + One + BLAS<<S::Device as DefaultBLASContext>::Context>,
     {
         self.dot_using(rhs, Default::default())
     }
@@ -44,7 +44,7 @@ impl<S: Storage> Matrix<S> {
     ) -> Matrix<DefaultVec<S::T, S::Device>>
     where
         S::Device: DefaultDeviceAllocator,
-        S::T: Zero + One + GEMM<C>,
+        S::T: Zero + One + BLAS<C>,
     {
         self.dot_into(rhs, ctx, Default::default())
     }
@@ -57,7 +57,7 @@ impl<S: Storage> Matrix<S> {
         alloc: A,
     ) -> Matrix<Vec<S::T, A>>
     where
-        S::T: Zero + One + GEMM<C>,
+        S::T: Zero + One + BLAS<C>,
     {
         let rows = self.shape[0];
         let cols = rhs.shape[1];
@@ -102,7 +102,13 @@ impl<'a, T, D: Device, Dim: Dimension> TensorView<'a, MaybeUninit<T>, D, Dim> {
 /// C = alpha * A * B.
 ///
 /// Uses the default [`BLASContext`] for the device.
-pub fn gemm_uninit<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
+///
+/// # Panics
+/// If the shapes of the matricies do not match the following pattern:
+/// * A = [M, K]
+/// * B = [K, N]
+/// * C = [M, N]
+pub fn gemm_uninit<F: BLAS<D::Context> + Zero, D: DefaultBLASContext>(
     alpha: F,
     a: MatrixView<F, D>,
     b: MatrixView<F, D>,
@@ -113,7 +119,13 @@ pub fn gemm_uninit<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
 
 /// Performs the basic matmul operation.
 /// C = alpha * A * B.
-pub fn gemm_uninit_ctx<F: GEMM<C> + Zero, C: BLASContext<Device = D>, D: Device>(
+///
+/// # Panics
+/// If the shapes of the matricies do not match the following pattern:
+/// * A = [M, K]
+/// * B = [K, N]
+/// * C = [M, N]
+pub fn gemm_uninit_ctx<F: BLAS<C> + Zero, C: BLASContext<Device = D>, D: Device>(
     ctx: C,
     alpha: F,
     a: MatrixView<F, D>,
@@ -129,7 +141,13 @@ pub fn gemm_uninit_ctx<F: GEMM<C> + Zero, C: BLASContext<Device = D>, D: Device>
 /// C = alpha * A * B + beta * C.
 ///
 /// Uses the default [`BLASContext`] for the device.
-pub fn gemm<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
+///
+/// # Panics
+/// If the shapes of the matricies do not match the following pattern:
+/// * A = [M, K]
+/// * B = [K, N]
+/// * C = [M, N]
+pub fn gemm<F: BLAS<D::Context> + Zero, D: DefaultBLASContext>(
     alpha: F,
     a: MatrixView<F, D>,
     b: MatrixView<F, D>,
@@ -152,7 +170,7 @@ pub fn gemm<F: GEMM<D::Context> + Zero, D: DefaultBLASContext>(
     clippy::cast_possible_truncation,
     clippy::needless_pass_by_value
 )]
-pub fn gemm_ctx<F: GEMM<C> + Zero, C: BLASContext<Device = D>, D: Device>(
+pub fn gemm_ctx<F: BLAS<C> + Zero, C: BLASContext<Device = D>, D: Device>(
     ctx: C,
     alpha: F,
     a: MatrixView<F, D>,

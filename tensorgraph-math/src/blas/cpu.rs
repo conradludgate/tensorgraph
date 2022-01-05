@@ -6,9 +6,6 @@ use super::{BLASContext, DefaultBLASContext};
 #[allow(clippy::module_inception)]
 mod blas_sys;
 
-#[cfg(feature = "matrixmultiply")]
-mod matmul;
-
 impl BLASContext for () {
     type Device = Cpu;
 }

@@ -24,9 +24,51 @@ pub trait DefaultBLASContext: Device {
     type Context: BLASContext<Device = Self> + Default;
 }
 
-/// A type that can be matrix multiplied
-pub trait GEMM<C: BLASContext>: Sized + Copy {
-    #[allow(clippy::too_many_arguments)]
+/// BLAS Level 1 operations (Vector only)
+#[allow(clippy::too_many_arguments)]
+pub trait BLAS1<C: BLASContext>: Sized + Copy {
+    /// Computes
+    /// > Y = alpha * X + Y
+    ///
+    /// # Safety
+    /// This is often a call across an FFI barrier, so the links or devices need to be
+    /// running and may perform UB unchecked by rust
+    unsafe fn axpy(
+        ctx: C,
+        n: i32,
+        alpha: Self,
+        x: DPtr<Self, C::Device>,
+        incx: i32,
+        y: DPtr<Self, C::Device>,
+        incy: i32,
+    );
+
+    /// Computes the vector dot product
+    ///
+    /// # Safety
+    /// This is often a call across an FFI barrier, so the links or devices need to be
+    /// running and may perform UB unchecked by rust
+    unsafe fn dot(
+        ctx: C,
+        n: i32,
+        x: DPtr<Self, C::Device>,
+        incx: i32,
+        y: DPtr<Self, C::Device>,
+        incy: i32,
+    ) -> Self;
+}
+
+/// BLAS Level 2 operations (Matrix-Vector)
+#[allow(clippy::too_many_arguments)]
+pub trait BLAS2<C: BLASContext>: Sized + Copy {
+}
+
+/// BLAS Level 3 operations (Matrix-Matrix)
+#[allow(clippy::too_many_arguments)]
+pub trait BLAS3<C: BLASContext>: Sized + Copy {
+    /// Compute the **Ge**neralised **M**atrix **M**ultiplication:
+    /// > C = alpha * AB + beta * C
+    ///
     /// # Safety
     /// This is often a call across an FFI barrier, so the links or devices need to be
     /// running and may perform UB unchecked by rust
@@ -47,3 +89,7 @@ pub trait GEMM<C: BLASContext>: Sized + Copy {
         ldc: i32,
     );
 }
+
+/// A complete BLAS library, levels 1, 2 and 3
+pub trait BLAS<C: BLASContext>: BLAS1<C> + BLAS2<C> + BLAS3<C> {}
+impl<F, C: BLASContext> BLAS<C> for F where F: BLAS1<C> + BLAS2<C> + BLAS3<C> {}

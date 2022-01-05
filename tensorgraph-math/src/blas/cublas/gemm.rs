@@ -1,13 +1,15 @@
-use rcublas_sys::{cublasDgemm_v2, cublasSgemm_v2};
-
-use tensorgraph_sys::device::{
-    cuda::{Cuda, Unified},
-    Device,
+use rcublas_sys::{
+    cublasDaxpy_v2, cublasDdot_v2, cublasDgemm_v2, cublasSaxpy_v2, cublasSdot_v2, cublasSgemm_v2,
 };
 
-use crate::blas::MatrixOp;
+use tensorgraph_sys::{
+    device::{cuda::Unified, DevicePtr},
+    ptr::DPtr,
+};
 
-use super::{SharedCublasContext, ToCublasResult, GEMM};
+use crate::blas::{MatrixOp, BLAS1, BLAS2, BLAS3};
+
+use super::{BLASContext, SharedCublasContext, ToCublasResult};
 
 impl From<MatrixOp> for rcublas_sys::cublasOperation_t {
     fn from(op: MatrixOp) -> Self {
@@ -19,156 +21,147 @@ impl From<MatrixOp> for rcublas_sys::cublasOperation_t {
     }
 }
 
-type DevicePointer<T> = <Cuda as Device>::Ptr<T>;
+macro_rules! impl_cublas1 {
+    ($float:ident<$ctx:ty> =>
+        axpy: $axpy:path,
+        dot: $dot:path,
+    ) => {
+        impl<'a> BLAS1<&'a $ctx> for $float {
+            unsafe fn axpy(
+                handle: &$ctx,
+                n: i32,
+                alpha: Self,
+                x: DPtr<Self, <&'a $ctx as BLASContext>::Device>,
+                incx: i32,
+                y: DPtr<Self, <&'a $ctx as BLASContext>::Device>,
+                incy: i32,
+            ) {
+                $axpy(
+                    handle.handle(),
+                    n,
+                    &alpha,
+                    DevicePtr::as_raw(x),
+                    incx,
+                    DevicePtr::as_raw(y),
+                    incy,
+                )
+                .to_cublas_result()
+                .unwrap();
+            }
 
-impl<'a> GEMM<&'a SharedCublasContext> for f32 {
-    unsafe fn gemm(
-        handle: &SharedCublasContext,
-        transa: MatrixOp,
-        transb: MatrixOp,
-        m: i32,
-        n: i32,
-        k: i32,
-        alpha: Self,
-        a: DevicePointer<Self>,
-        lda: i32,
-        b: DevicePointer<Self>,
-        ldb: i32,
-        beta: Self,
-        mut c: DevicePointer<Self>,
-        ldc: i32,
-    ) {
-        cublasSgemm_v2(
-            handle.handle(),
-            transa.into(),
-            transb.into(),
-            m,
-            n,
-            k,
-            &alpha,
-            a.as_raw(),
-            lda,
-            b.as_raw(),
-            ldb,
-            &beta,
-            c.as_raw_mut(),
-            ldc,
-        )
-        .to_cublas_result()
-        .unwrap();
-    }
+            unsafe fn dot(
+                handle: &$ctx,
+                n: i32,
+                x: DPtr<Self, <&'a $ctx as BLASContext>::Device>,
+                incx: i32,
+                y: DPtr<Self, <&'a $ctx as BLASContext>::Device>,
+                incy: i32,
+            ) -> Self {
+                let mut res = 0.;
+                $dot(
+                    handle.handle(),
+                    n,
+                    DevicePtr::as_raw(x),
+                    incx,
+                    DevicePtr::as_raw(y),
+                    incy,
+                    &mut res,
+                )
+                .to_cublas_result()
+                .unwrap();
+                res
+            }
+        }
+    };
 }
 
-impl<'a> GEMM<&'a SharedCublasContext> for f64 {
-    unsafe fn gemm(
-        handle: &SharedCublasContext,
-        transa: MatrixOp,
-        transb: MatrixOp,
-        m: i32,
-        n: i32,
-        k: i32,
-        alpha: Self,
-        a: DevicePointer<Self>,
-        lda: i32,
-        b: DevicePointer<Self>,
-        ldb: i32,
-        beta: Self,
-        mut c: DevicePointer<Self>,
-        ldc: i32,
-    ) {
-        cublasDgemm_v2(
-            handle.handle(),
-            transa.into(),
-            transb.into(),
-            m,
-            n,
-            k,
-            &alpha,
-            a.as_raw(),
-            lda,
-            b.as_raw(),
-            ldb,
-            &beta,
-            c.as_raw_mut(),
-            ldc,
-        )
-        .to_cublas_result()
-        .unwrap();
-    }
+macro_rules! impl_cublas2 {
+    ($float:ident<$ctx:ty> =>
+    ) => {
+        impl<'a> BLAS2<&'a $ctx> for $float {}
+    };
 }
 
-impl<'a> GEMM<&'a Unified<SharedCublasContext>> for f32 {
-    unsafe fn gemm(
-        handle: &Unified<SharedCublasContext>,
-        transa: MatrixOp,
-        transb: MatrixOp,
-        m: i32,
-        n: i32,
-        k: i32,
-        alpha: Self,
-        a: *mut Self,
-        lda: i32,
-        b: *mut Self,
-        ldb: i32,
-        beta: Self,
-        c: *mut Self,
-        ldc: i32,
-    ) {
-        cublasSgemm_v2(
-            handle.handle(),
-            transa.into(),
-            transb.into(),
-            m,
-            n,
-            k,
-            &alpha,
-            a,
-            lda,
-            b,
-            ldb,
-            &beta,
-            c,
-            ldc,
-        )
-        .to_cublas_result()
-        .unwrap();
-    }
+macro_rules! impl_cublas3 {
+    ($float:ident<$ctx:ty> =>
+        gemm: $gemm:path,
+    ) => {
+        impl<'a> BLAS3<&'a $ctx> for $float {
+            unsafe fn gemm(
+                handle: &$ctx,
+                transa: MatrixOp,
+                transb: MatrixOp,
+                m: i32,
+                n: i32,
+                k: i32,
+                alpha: Self,
+                a: DPtr<Self, <&'a $ctx as BLASContext>::Device>,
+                lda: i32,
+                b: DPtr<Self, <&'a $ctx as BLASContext>::Device>,
+                ldb: i32,
+                beta: Self,
+                c: DPtr<Self, <&'a $ctx as BLASContext>::Device>,
+                ldc: i32,
+            ) {
+                $gemm(
+                    handle.handle(),
+                    transa.into(),
+                    transb.into(),
+                    m,
+                    n,
+                    k,
+                    &alpha,
+                    DevicePtr::as_raw(a),
+                    lda,
+                    DevicePtr::as_raw(b),
+                    ldb,
+                    &beta,
+                    DevicePtr::as_raw(c),
+                    ldc,
+                )
+                .to_cublas_result()
+                .unwrap();
+            }
+        }
+    };
 }
 
-impl<'a> GEMM<&'a Unified<SharedCublasContext>> for f64 {
-    unsafe fn gemm(
-        handle: &Unified<SharedCublasContext>,
-        transa: MatrixOp,
-        transb: MatrixOp,
-        m: i32,
-        n: i32,
-        k: i32,
-        alpha: Self,
-        a: *mut Self,
-        lda: i32,
-        b: *mut Self,
-        ldb: i32,
-        beta: Self,
-        c: *mut Self,
-        ldc: i32,
-    ) {
-        cublasDgemm_v2(
-            handle.handle(),
-            transa.into(),
-            transb.into(),
-            m,
-            n,
-            k,
-            &alpha,
-            a,
-            lda,
-            b,
-            ldb,
-            &beta,
-            c,
-            ldc,
-        )
-        .to_cublas_result()
-        .unwrap();
-    }
-}
+impl_cublas1!(f32<SharedCublasContext> =>
+    axpy: cublasSaxpy_v2,
+    dot: cublasSdot_v2,
+);
+impl_cublas2!(f32<SharedCublasContext> =>
+);
+impl_cublas3!(f32<SharedCublasContext> =>
+    gemm: cublasSgemm_v2,
+);
+
+impl_cublas1!(f64<SharedCublasContext> =>
+    axpy: cublasDaxpy_v2,
+    dot: cublasDdot_v2,
+);
+impl_cublas2!(f64<SharedCublasContext> =>
+);
+impl_cublas3!(f64<SharedCublasContext> =>
+    gemm: cublasDgemm_v2,
+);
+
+impl_cublas1!(f32<Unified<SharedCublasContext>> =>
+    axpy: cublasSaxpy_v2,
+    dot: cublasSdot_v2,
+);
+impl_cublas2!(f32<Unified<SharedCublasContext>> =>
+);
+impl_cublas3!(f32<Unified<SharedCublasContext>> =>
+    gemm: cublasSgemm_v2,
+);
+
+impl_cublas1!(f64<Unified<SharedCublasContext>> =>
+    axpy: cublasDaxpy_v2,
+    dot: cublasDdot_v2,
+);
+impl_cublas2!(f64<Unified<SharedCublasContext>> =>
+);
+impl_cublas3!(f64<Unified<SharedCublasContext>> =>
+    gemm: cublasDgemm_v2,
+);

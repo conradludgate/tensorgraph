@@ -58,9 +58,6 @@ pub fn matmul(c: &mut Criterion) {
     #[cfg(feature = "netlib")]
     group.bench_function("netlib", cpu);
 
-    #[cfg(feature = "matrixmultiply")]
-    group.bench_function("matrixmultiply", cpu);
-
     #[cfg(feature = "accelerate")]
     group.bench_function("accelerate", cpu);
 

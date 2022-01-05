@@ -47,7 +47,7 @@ impl<'ctx> Drop for Stream<'ctx> {
 }
 
 /// A Shared CUDA Stream. Created through [`Deref`] from [`Stream`].
-/// Is a [`DeviceAllocator`] for Cuda
+/// Is a [`DeviceAllocator`](super::DeviceAllocator) for Cuda
 pub struct SharedStream(CUstream_st);
 
 impl SharedStream {

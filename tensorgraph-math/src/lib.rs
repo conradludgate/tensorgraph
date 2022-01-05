@@ -44,7 +44,7 @@
 //!
 //! ```
 //! use tensorgraph_math::{
-//!     blas::{DefaultBLASContext, cublas::CublasContext, GEMM},
+//!     blas::{DefaultBLASContext, cublas::CublasContext, BLAS},
 //!     sys::{
 //!         device::{DefaultDeviceAllocator, cuda::{Context, Cuda, Stream}, cpu::Cpu},
 //!         DefaultVec, View,
@@ -75,7 +75,7 @@
 //! /// using that devices default allocator and BLAS provider
 //! fn run<D: DefaultDeviceAllocator + DefaultBLASContext>()
 //! where
-//!     f32: GEMM<D::Context>,
+//!     f32: BLAS<D::Context>,
 //! {
 //!     //     0 1
 //!     // A = 2 3
@@ -114,7 +114,7 @@
 //! #![feature(allocator_api)]
 //! use std::{alloc::Global, ops::Deref};
 //! use tensorgraph_math::{
-//!     blas::{BLASContext, cublas::{CublasContext}, GEMM},
+//!     blas::{BLASContext, cublas::{CublasContext}, BLAS},
 //!     sys::{
 //!         device::{cuda::{Context, Cuda, Stream}, cpu::Cpu, Device, DeviceAllocator},
 //!         Vec, View,
@@ -143,7 +143,7 @@
 //!
 //! fn run<C: BLASContext, A: DeviceAllocator<Device = C::Device> + Copy>(ctx: C, alloc: A)
 //! where
-//!     f32: GEMM<C>,
+//!     f32: BLAS<C>,
 //! {
 //!     //     0 1
 //!     // A = 2 3

@@ -22,7 +22,7 @@
 
 /// Provides implementation of a Device [`Box`]
 pub mod boxed;
-/// Provides trait defintion and implementations of a [`Device`]
+
 pub mod device;
 
 /// Provides standard pointer types
