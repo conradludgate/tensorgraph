@@ -83,42 +83,6 @@ where
     }
 }
 
-/// Performs the basic vector operation.
-/// > y = alpha * x + y.
-///
-/// # Panics
-/// If the vectors do not have the same length
-#[allow(
-    clippy::cast_possible_wrap,
-    clippy::cast_possible_truncation,
-    clippy::needless_pass_by_value
-)]
-pub fn axpy_ctx<F: BLAS1<C>, C: BLASContext<Device = D>, D: Device>(
-    ctx: C,
-    alpha: F,
-    x: VectorView<F, D>,
-    y: VectorViewMut<F, D>,
-) {
-    let [n] = x.shape;
-    let [m] = y.shape;
-    assert_eq!(n, m);
-
-    let incx = x.strides[0] as i32;
-    let incy = y.strides[0] as i32;
-
-    unsafe {
-        F::axpy(
-            ctx,
-            n as i32,
-            alpha,
-            x.data.as_ref().as_ptr(),
-            incx,
-            y.data.as_ptr(),
-            incy,
-        );
-    }
-}
-
 impl<S: StorageMut> MulAssign<S::T> for Vector<S>
 where
     S::Device: DefaultBLASContext,
@@ -154,7 +118,43 @@ impl<S: StorageMut> Vector<S> {
     }
 }
 
-/// Performs the basic vector operation.
+/// Performs the vector scale and add operation.
+/// > y = alpha * x + y.
+///
+/// # Panics
+/// If the vectors do not have the same length
+#[allow(
+    clippy::cast_possible_wrap,
+    clippy::cast_possible_truncation,
+    clippy::needless_pass_by_value
+)]
+pub fn axpy_ctx<F: BLAS1<C>, C: BLASContext<Device = D>, D: Device>(
+    ctx: C,
+    alpha: F,
+    x: VectorView<F, D>,
+    y: VectorViewMut<F, D>,
+) {
+    let [n] = x.shape;
+    let [m] = y.shape;
+    assert_eq!(n, m);
+
+    let incx = x.strides[0] as i32;
+    let incy = y.strides[0] as i32;
+
+    unsafe {
+        F::axpy(
+            ctx,
+            n as i32,
+            alpha,
+            x.data.as_ref().as_ptr(),
+            incx,
+            y.data.as_ptr(),
+            incy,
+        );
+    }
+}
+
+/// Performs the vector scale operation.
 /// > x = alpha * x.
 ///
 /// # Panics

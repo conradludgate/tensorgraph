@@ -2,4 +2,5 @@
 members = [
     "tensorgraph-sys",
     "tensorgraph-math",
+    "tensorgraph",
 ]

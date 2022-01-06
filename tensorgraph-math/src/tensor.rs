@@ -7,8 +7,10 @@ use crate::{
     storage::{IntoOwned, Storage, StorageMut},
 };
 
+mod dot;
 mod matrix;
 mod vector;
+pub use dot::Dot;
 pub use matrix::*;
 pub use vector::*;
 

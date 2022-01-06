@@ -1,0 +1,17 @@
+[package]
+name = "tensorgraph"
+version = "0.1.10"
+edition = "2021"
+description = "Tensor library with autodiff"
+repository = "https://github.com/conradludgate/tensorgraph"
+keywords = ["numerics", "machine-learning", "neural-network", "cuda", "blas"]
+license-file = "../LICENSE"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tensorgraph-math = { version = "=0.1.11", path = "../tensorgraph-math", features = ["smallvec"] }
+
+smallvec = { version = "1.7", features = ["union"] }
+smallstr = "0.2"
+eyre = "0.6"

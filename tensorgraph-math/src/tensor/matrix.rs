@@ -7,7 +7,7 @@ use tensorgraph_sys::{
 };
 
 use crate::{
-    blas::{BLASContext, DefaultBLASContext, MatrixOp, BLAS, BLAS2, BLAS3},
+    blas::{BLASContext, DefaultBLASContext, MatrixOp, BLAS2, BLAS3},
     storage::Storage,
 };
 
@@ -30,7 +30,7 @@ impl<S: Storage> Matrix<S> {
     pub fn dot(&self, rhs: Vector<&ViewOf<S>>) -> Vector<DefaultVec<S::T, S::Device>>
     where
         S::Device: DefaultDeviceAllocator + DefaultBLASContext,
-        S::T: Zero + One + BLAS<<S::Device as DefaultBLASContext>::Context>,
+        S::T: Zero + One + BLAS2<<S::Device as DefaultBLASContext>::Context>,
     {
         self.dot_using(rhs, Default::default())
     }
@@ -43,7 +43,7 @@ impl<S: Storage> Matrix<S> {
     ) -> Vector<DefaultVec<S::T, S::Device>>
     where
         S::Device: DefaultDeviceAllocator,
-        S::T: Zero + One + BLAS<C>,
+        S::T: Zero + One + BLAS2<C>,
     {
         self.dot_into(rhs, ctx, Default::default())
     }
@@ -56,7 +56,7 @@ impl<S: Storage> Matrix<S> {
         alloc: A,
     ) -> Vector<Vec<S::T, A>>
     where
-        S::T: Zero + One + BLAS<C>,
+        S::T: Zero + One + BLAS2<C>,
     {
         let rows = self.shape[0];
         let mut v = Vec::with_capacity_in(rows, alloc);
@@ -76,7 +76,7 @@ impl<S: Storage> Matrix<S> {
     pub fn matmul(&self, rhs: Matrix<&ViewOf<S>>) -> Matrix<DefaultVec<S::T, S::Device>>
     where
         S::Device: DefaultDeviceAllocator + DefaultBLASContext,
-        S::T: Zero + One + BLAS<<S::Device as DefaultBLASContext>::Context>,
+        S::T: Zero + One + BLAS3<<S::Device as DefaultBLASContext>::Context>,
     {
         self.matmul_using(rhs, Default::default())
     }
@@ -89,7 +89,7 @@ impl<S: Storage> Matrix<S> {
     ) -> Matrix<DefaultVec<S::T, S::Device>>
     where
         S::Device: DefaultDeviceAllocator,
-        S::T: Zero + One + BLAS<C>,
+        S::T: Zero + One + BLAS3<C>,
     {
         self.matmul_into(rhs, ctx, Default::default())
     }
@@ -102,7 +102,7 @@ impl<S: Storage> Matrix<S> {
         alloc: A,
     ) -> Matrix<Vec<S::T, A>>
     where
-        S::T: Zero + One + BLAS<C>,
+        S::T: Zero + One + BLAS3<C>,
     {
         let rows = self.shape[0];
         let cols = rhs.shape[1];
@@ -119,7 +119,7 @@ impl<S: Storage> Matrix<S> {
     }
 }
 
-/// Performs the basic matrix-vector multiplication operation.
+/// Performs a matrix-vector multiplication operation into an uninit vector.
 /// > y = alpha * Ax.
 ///
 /// Uses the default [`BLASContext`] for the device.
@@ -138,7 +138,7 @@ pub fn gemv_uninit<F: BLAS2<D::Context> + Zero, D: DefaultBLASContext>(
     gemv_uninit_ctx(D::Context::default(), alpha, a, x, y);
 }
 
-/// Performs the basic matrix-vector multiplication operation.
+/// Performs a matrix-vector multiplication operation into an uninit vector.
 /// > y = alpha * Ax.
 ///
 /// # Panics
@@ -158,7 +158,7 @@ pub fn gemv_uninit_ctx<F: BLAS2<C> + Zero, C: BLASContext<Device = D>, D: Device
     unsafe { gemv_ctx(ctx, alpha, a, x, F::zero(), y.assume_init()) }
 }
 
-/// Performs the basic matrix-vector multiplication operation.
+/// Performs a matrix-vector multiplication operation.
 /// > y = alpha * Ax + beta * y.
 ///
 /// Uses the default [`BLASContext`] for the device.
@@ -178,7 +178,7 @@ pub fn gemv<F: BLAS2<D::Context> + Zero, D: DefaultBLASContext>(
     gemv_ctx(D::Context::default(), alpha, a, x, beta, y);
 }
 
-/// Performs the basic matrix-vector multiplication operation.
+/// Performs a matrix-vector multiplication operation.
 /// > y = alpha * Ax + beta * y.
 ///
 /// # Panics
@@ -230,7 +230,7 @@ pub fn gemv_ctx<F: BLAS2<C> + Zero, C: BLASContext<Device = D>, D: Device>(
     }
 }
 
-/// Performs the basic matmul operation.
+/// Performs the matrix-matrix multiplication operation into an uninit matrix.
 /// > C = alpha * AB.
 ///
 /// Uses the default [`BLASContext`] for the device.
@@ -249,7 +249,7 @@ pub fn gemm_uninit<F: BLAS3<D::Context> + Zero, D: DefaultBLASContext>(
     gemm_uninit_ctx(D::Context::default(), alpha, a, b, c);
 }
 
-/// Performs the basic matmul operation.
+/// Performs the matrix-matrix multiplication operation into an uninit matrix.
 /// > C = alpha * AB.
 ///
 /// # Panics
@@ -269,7 +269,7 @@ pub fn gemm_uninit_ctx<F: BLAS3<C> + Zero, C: BLASContext<Device = D>, D: Device
     unsafe { gemm_ctx(ctx, alpha, a, b, F::zero(), c.assume_init()) }
 }
 
-/// Performs the basic matmul operation.
+/// Performs the matrix-matrix multiplication operation.
 /// > C = alpha * AB + beta * C.
 ///
 /// Uses the default [`BLASContext`] for the device.
@@ -289,7 +289,7 @@ pub fn gemm<F: BLAS3<D::Context> + Zero, D: DefaultBLASContext>(
     gemm_ctx(D::Context::default(), alpha, a, b, beta, c);
 }
 
-/// Performs the basic matmul operation.
+/// Performs the matrix-matrix multiplication operation.
 /// > C = alpha * AB + beta * C.
 ///
 /// # Panics

@@ -22,14 +22,14 @@ where
     let b = a.clone();
     let c = b.clone();
 
-    let mut a = Tensor::from_shape([512, 512], a);
-    let b = Tensor::from_shape([512, 512], b);
+    let a = Tensor::from_shape([512, 512], a);
+    let mut b = Tensor::from_shape([512, 512], b);
     let mut c = Tensor::from_shape([512, 512], c);
 
     let ctx = D::Context::default();
     for _ in 0..100 {
         gemm_ctx(ctx, 1., a.view(), b.view(), 0., c.view_mut());
-        std::mem::swap(&mut a, &mut c);
+        std::mem::swap(&mut b, &mut c);
     }
 
     c.into_inner()
