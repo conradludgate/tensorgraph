@@ -127,8 +127,8 @@ impl<S: Storage> Matrix<S> {
 /// # Panics
 /// If the shapes of the matricies do not match the following pattern:
 /// * A = (M, N)
-/// * X = (N)
-/// * Y = (M)
+/// * x = (N)
+/// * y = (M)
 pub fn gemv_uninit<F: BLAS2<D::Context> + Zero, D: DefaultBLASContext>(
     alpha: F,
     a: MatrixView<F, D>,
@@ -144,8 +144,8 @@ pub fn gemv_uninit<F: BLAS2<D::Context> + Zero, D: DefaultBLASContext>(
 /// # Panics
 /// If the shapes of the matricies do not match the following pattern:
 /// * A = (M, N)
-/// * X = (N)
-/// * Y = (M)
+/// * x = (N)
+/// * y = (M)
 pub fn gemv_uninit_ctx<F: BLAS2<C> + Zero, C: BLASContext<Device = D>, D: Device>(
     ctx: C,
     alpha: F,
@@ -166,8 +166,8 @@ pub fn gemv_uninit_ctx<F: BLAS2<C> + Zero, C: BLASContext<Device = D>, D: Device
 /// # Panics
 /// If the shapes of the matricies do not match the following pattern:
 /// * A = (M, N)
-/// * X = (N)
-/// * Y = (M)
+/// * x = (N)
+/// * y = (M)
 pub fn gemv<F: BLAS2<D::Context> + Zero, D: DefaultBLASContext>(
     alpha: F,
     a: MatrixView<F, D>,
@@ -184,8 +184,8 @@ pub fn gemv<F: BLAS2<D::Context> + Zero, D: DefaultBLASContext>(
 /// # Panics
 /// If the shapes of the matricies do not match the following pattern:
 /// * A = (M, N)
-/// * X = (N)
-/// * Y = (M)
+/// * x = (N)
+/// * y = (M)
 #[allow(
     clippy::cast_possible_wrap,
     clippy::cast_possible_truncation,

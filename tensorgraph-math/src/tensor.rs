@@ -1,15 +1,18 @@
 use std::mem::MaybeUninit;
 
-use tensorgraph_sys::{ptr::Ref, View, ViewMut, device::Device};
+use tensorgraph_sys::{device::Device, ptr::Ref, View, ViewMut};
 
 use crate::{
-    dims::{Dimension, RemoveDim},
+    dims::{Dimension, RemoveDim, InsertDim},
     storage::{IntoOwned, Storage, StorageMut},
 };
 
 mod dot;
 mod matrix;
+mod ops;
 mod vector;
+#[cfg(feature = "ndarray")]
+mod ndarray;
 pub use dot::Dot;
 pub use matrix::*;
 pub use vector::*;
@@ -82,6 +85,61 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
         }
     }
 
+    /// Converts the tensor's dimension type.
+    ///
+    /// # Errors
+    /// If converting between the dimensions fails, e.g
+    pub fn into_dim<D: Dimension>(self) -> Tensor<S, D>
+    where
+        Dim: Into<D>,
+    {
+        Tensor {
+            shape: self.shape.into(),
+            strides: self.strides.into(),
+            data: self.data,
+        }
+    }
+
+    /// Converts the tensor's dimension type.
+    ///
+    /// # Errors
+    /// If converting between the dimensions fails, e.g
+    pub fn try_into_dim<D: Dimension>(self) -> Result<Tensor<S, D>, Dim::Error>
+    where
+        Dim: TryInto<D>,
+    {
+        Ok(Tensor {
+            shape: self.shape.try_into()?,
+            strides: self.strides.try_into()?,
+            data: self.data,
+        })
+    }
+
+    /// Converts the tensor's dimension type.
+    ///
+    /// # Errors
+    /// If converting between the dimensions fails, e.g
+    pub fn insert_axis(self, axis: usize) -> Tensor<S, Dim::Larger>
+    where
+        Dim: InsertDim,
+    {
+        Tensor {
+            shape: self.shape.insert(axis, 1),
+            strides: self.strides.insert(axis, 1),
+            data: self.data,
+        }
+    }
+
+    /// Gets the shape of the tensor
+    pub fn shape(&self) -> &Dim {
+        &self.shape
+    }
+
+    /// Gets the data layout of the tensor
+    pub fn strides(&self) -> &Dim {
+        &self.strides
+    }
+
     /// Consumes the tensor, returning the underlying data
     pub fn into_inner(self) -> S {
         self.data
@@ -93,6 +151,10 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
         self.strides.as_mut().reverse();
     }
 
+    /// Swaps the two axes of the tensor.
+    ///
+    /// # Panics
+    /// If i or j are out of bounds of the dimension
     pub fn swap_axes(&mut self, i: usize, j: usize) {
         self.shape.as_mut().swap(i, j);
         self.strides.as_mut().swap(i, j);
@@ -139,6 +201,30 @@ impl<S: Storage, Dim: Dimension> Tensor<S, Dim> {
             shape,
             strides,
             data: &self.data.as_ref()[s * n..],
+        }
+    }
+}
+
+impl<S: StorageMut, Dim: Dimension> Tensor<S, Dim> {
+    /// Slices the tensor over a specific axis. The resulting tensor will be a dimension smaller
+    ///
+    /// # Panics
+    /// If the axis is outside of the length of the dimensions
+    pub fn slice_axis_mut(&mut self, axis: usize, n: usize) -> Tensor<&mut ViewOf<S>, Dim::Smaller>
+    where
+        Dim: RemoveDim,
+    {
+        assert!(axis < self.shape.as_ref().len());
+
+        let (shape, m) = self.shape.remove(axis);
+        let (strides, s) = self.strides.remove(axis);
+
+        assert!(n < m);
+
+        Tensor {
+            shape,
+            strides,
+            data: &mut self.data.as_mut()[s * n..],
         }
     }
 }

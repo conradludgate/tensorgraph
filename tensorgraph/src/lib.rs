@@ -1,9 +1,16 @@
 use std::cell::RefCell;
 
-use eyre::Result;
+use eyre::{Result, ensure};
 use smallstr::SmallString;
 use smallvec::SmallVec;
-use tensorgraph_math::{sys::{device::{Device, DeviceAllocator}, Vec, ptr::Ref}, tensor::TensorViewMut};
+use tensorgraph_math::{
+    sys::{
+        device::{Device, DeviceAllocator},
+        ptr::Ref,
+        Vec,
+    },
+    tensor::TensorViewMut,
+};
 
 pub struct Graph<F, D: Device> {
     pub(crate) tensors: RefCell<Vec<TensorInternal<F, D>>>,
@@ -20,7 +27,11 @@ pub struct GraphRef<'graph, F, D: Device> {
 }
 
 impl<F, D: Device> Graph<F, D> {
-    pub fn apply(&self, op: impl Op<F, D> + 'static, inputs: &[Tensor<F, D>]) -> Result<Tensor<F, D>> {
+    pub fn apply(
+        &self,
+        op: impl Op<F, D> + 'static,
+        inputs: &[Tensor<F, D>],
+    ) -> Result<Tensor<F, D>> {
         let tensors = self.tensors.borrow();
         let id = tensors.len();
 
@@ -59,6 +70,40 @@ pub trait Op<F, D: Device> {
 
     fn name(&self) -> &'static str {
         std::any::type_name::<Self>()
+    }
+}
+
+struct Variable;
+impl<F, D: Device> Op<F, D> for Variable {
+    fn output_shape(&self, _inputs: &[Dim]) -> Result<Dim> {
+        Err(eyre::eyre!("Variable is just a marker trait and should not be used as an op. This is a bug in tensorgraph, please report: https://github.com/conradludgate/tensorgraph/issues"))
+    }
+    fn compute(&self, _ctx: &mut ComputeContext<'_, F, D>) {}
+    fn grad(&self, _ctx: &mut GradiantContext<'_, F, D>) {}
+}
+
+struct AddOp;
+
+impl<F, D: Device> Op<F, D> for AddOp {
+    fn output_shape(&self, inputs: &[Dim]) -> Result<Dim> {
+        match inputs {
+            [lhs, rhs] => {
+                if lhs == rhs {
+                    Ok(lhs.clone())
+                } else {
+                    Err(eyre::eyre!("invalid shapes"))
+                }
+            }
+            _ => Err(eyre::eyre!("add only accepts 2 inputs")),
+        }
+    }
+
+    fn compute(&self, ctx: &mut ComputeContext<'_, F, D>) {
+        
+    }
+
+    fn grad(&self, ctx: &mut GradiantContext<'_, F, D>) {
+        todo!()
     }
 }
 
