@@ -1,19 +1,10 @@
-# tensorgraph
-
-A tensorflow-like computation-graph library written in Rust with GPU acceleration (currently only CUDA).
-
-## Examples
-
-This is how I invision this library to look like
-
-```rust
 use tensorgraph as tg;
 use tg::{Tensor, Graph, Feed, grads, zeroes};
-use tg::ops::{matmul}
-use tg::nn::{optimisers::Adam, activation::{relu, sigmoid}, initalisers::xavier};
+// use tg::ops::{matmul}
+// use tg::nn::{optimisers::Adam, activation::{relu, sigmoid}, initalisers::xavier};
 
 fn main() {
-    let g = Graph::new();
+    let g = Graph::default();
 
     // 0 implies that this dimension is unspecified
     // but will need to be specified when fed into the graph
@@ -80,4 +71,3 @@ fn dense<'g>(g: impl GraphLike<'g>, x: Tensor<'g>, output_size: usize) -> Tensor
 
     matmul(x, w) + b
 }
-```
